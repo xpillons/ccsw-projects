@@ -14,6 +14,14 @@ case $os_release in
         dnf install -y cvmfs
         dnf install -y https://github.com/EESSI/filesystem-layer/releases/download/latest/cvmfs-config-eessi-latest.noarch.rpm
         ;;
+    ubuntu)
+        wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb
+        dpkg -i cvmfs-release-latest_all.deb
+        wget https://github.com/EESSI/filesystem-layer/releases/download/latest/cvmfs-config-eessi_latest_all.deb
+        dpkg -i cvmfs-config-eessi_latest_all.deb
+        apt update
+        apt install -y cvmfs
+        ;;
     *)
         logger -s "Untested OS $os_release $os_version"
         exit 0
