@@ -1,0 +1,10 @@
+[Unit]
+Description=Prometheus Slurm Exporter
+
+[Service]
+ExecStart=/root/go/bin/prometheus-slurm-exporter -slurm.cli-fallback=true
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
