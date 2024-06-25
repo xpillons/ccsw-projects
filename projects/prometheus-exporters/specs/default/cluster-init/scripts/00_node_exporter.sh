@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$script_dir/../files/common.sh" 
+SPEC_FILE_ROOT="$script_dir/../files"
+
+source "$SPEC_FILE_ROOT/common.sh" 
 
 NODE_EXPORTER_VERSION=1.8.1
-SPEC_FILE_ROOT="$script_dir/../files"
 
 function install_node_exporter() {
     # If /opt/node_exporter doen't exist, download and extract node_exporter
@@ -14,6 +15,7 @@ function install_node_exporter() {
         tar xvf node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
         mv node_exporter-$NODE_EXPORTER_VERSION.linux-amd64 node_exporter
         chown root:root -R node_exporter
+        rm -fv node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
     fi
 
     # Install node exporter service
