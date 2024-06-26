@@ -29,7 +29,7 @@ platform_version=$(jetpack config platform_version)
 #supported platforms RHEL 8/9, AlmaLinux 8/9, SLES 15, Ubuntu 20/22
 # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
-    apt install -y sssd sssd-tools sssd-ldap ldap-utils dos2unix
+    DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils dos2unix
     TLS_CERT_Location="/etc/ssl/certs/ca-certificates.crt"
 
 fi
@@ -81,7 +81,7 @@ sudo systemctl start sssd.service #start sssd this will auto pick up the sssd.co
 
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
     mkdir -p "$HOME_DIR"
-    sudo pam-auth-update --enable mkhomedir # auto create home directories on login
+    DEBIAN_FRONTEND=noninteractive sudo pam-auth-update --enable mkhomedir # auto create home directories on login
 fi
 
 if [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "suse" ] || [ "$platform_family" == "rhel" ]; then 
