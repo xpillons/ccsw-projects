@@ -43,8 +43,8 @@ if [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform
 fi
 
 if [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
-    sudo systemctl stop nscd
-    sudo systemctl disable nscd
+    systemctl stop nscd
+    systemctl disable nscd
 
     if zypper lr home_lemmy04_idm &> /dev/null; then
     zypper rr home_lemmy04_idm
@@ -77,11 +77,11 @@ dos2unix /etc/sssd/sssd.conf # convert to unix format
 chmod 600 /etc/sssd/sssd.conf # permissions required by sssd
 chown root:root /etc/sssd/sssd.conf # permissions required by sssd
 
-sudo systemctl start sssd.service #start sssd this will auto pick up the sssd.conf
+systemctl start sssd.service #start sssd this will auto pick up the sssd.conf
 
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
     mkdir -p "$HOME_DIR"
-    DEBIAN_FRONTEND=noninteractive sudo pam-auth-update --enable mkhomedir # auto create home directories on login
+    DEBIAN_FRONTEND=noninteractive pam-auth-update --enable mkhomedir # auto create home directories on login
 fi
 
 if [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "suse" ] || [ "$platform_family" == "rhel" ]; then 
@@ -100,7 +100,7 @@ fi
 
 if [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
     mkdir -p "$HOME_DIR"
-    sudo pam-config -a --sss
+    pam-config -a --sss
     pam-config -a --mkhomedir
     systemctl enable --now oddjobd.service
     authselect select sssd with-mkhomedir --force # select sssd profile with auto make home dir on login and force overwrite files if it has been setup before
