@@ -2,7 +2,7 @@
 set -e
 source "$CYCLECLOUD_SPEC_PATH/files/common.sh" 
 
-function configure_ssh_keys() {}
+function configure_ssh_keys() {
     cp -f "$CYCLECLOUD_SPEC_PATH"/files/init_sshkeys.sh /etc/profile.d # Copy setup script file
 }
 
