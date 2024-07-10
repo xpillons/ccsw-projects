@@ -6,6 +6,7 @@ if [ $(id -u) -le 1000 ]; then
 fi
 if [ ! -f  ~/.ssh/id_rsa.pub ] ; then
     mkdir -p ~/.ssh
+    # BUGBUG: This is actually failing on AlmaLinux 8.7 : Error looking up public keys
     PUB_KEY=$(/usr/bin/sss_ssh_authorizedkeys $USER) # Get the ssh keys from LDAP
     # if PUB_KEY is not empty, then write it to id_rsa.pub, otherwise generate a new key pair
     if [ -z "$PUB_KEY" ]; then
