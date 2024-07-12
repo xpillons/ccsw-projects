@@ -12,7 +12,7 @@ function install_prometheus() {
     # If /opt/prometheus doen't exist, download and extract prometheus
     if [ ! -d /opt/prometheus ]; then
         cd /opt
-        wget https://github.com/prometheus/prometheus/releases/download/v$PROMETHEUS_VERSION/prometheus-$PROMETHEUS_VERSION.linux-amd64.tar.gz
+        wget -q https://github.com/prometheus/prometheus/releases/download/v$PROMETHEUS_VERSION/prometheus-$PROMETHEUS_VERSION.linux-amd64.tar.gz
         mkdir -pv prometheus
         tar xvf  prometheus-$PROMETHEUS_VERSION.linux-amd64.tar.gz -C prometheus --strip-components=1
         chown -R root:root prometheus

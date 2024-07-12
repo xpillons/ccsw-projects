@@ -11,7 +11,7 @@ function install_node_exporter() {
     # If /opt/node_exporter doen't exist, download and extract node_exporter
     if [ ! -d /opt/node_exporter ]; then
         cd /opt
-        wget https://github.com/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+        wget -q https://github.com/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
         mkdir -pv node_exporter 
         tar xvf node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz -C node_exporter --strip-components=1
         chown root:root -R node_exporter

@@ -9,14 +9,13 @@ SLURM_EXPORTER_VERSION=v1.5.1
 
 function install_slurm_exporter()
 {
-    wget https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz
+    wget -q https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz
     rm -rf /usr/local/go && tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
     rm go$GO_VERSION.linux-amd64.tar.gz
 
     echo "export PATH=\$PATH:/usr/local/go/bin" >> /etc/bash.bashrc
-    source .bashrc
 
-    go install github.com/rivosinc/prometheus-slurm-exporter@$SLURM_EXPORTER_VERSION
+    /usr/local/go/bin/go install github.com/rivosinc/prometheus-slurm-exporter@$SLURM_EXPORTER_VERSION
 
     cp $SPEC_FILE_ROOT/prometheus-slurm-exporter.service /etc/systemd/system
     systemctl daemon-reload
@@ -25,6 +24,6 @@ function install_slurm_exporter()
 
 }
 
-if is_scheduler ; then
-    install_slurm_exporter
-fi
+# if is_scheduler ; then
+#     install_slurm_exporter
+# fi
