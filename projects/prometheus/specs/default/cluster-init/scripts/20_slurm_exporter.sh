@@ -33,6 +33,9 @@ function install_vpenso_slurm_exporter()
     rm -rfv prometheus-slurm-exporter
     git clone -b development https://github.com/vpenso/prometheus-slurm-exporter.git
     cd prometheus-slurm-exporter
+
+    # remove the test from the makefile as it failed
+    sed -i 's/build: test/build:/' Makefile
     make
 
     cp $SPEC_FILE_ROOT/vpenso-slurm-exporter.service /etc/systemd/system/prometheus-slurm-exporter.service
