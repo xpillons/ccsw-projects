@@ -2,7 +2,7 @@
 Description=Prometheus Slurm Exporter
 
 [Service]
-ExecStart=/opt/prometheus-slurm-exporter/bin/prometheus-slurm-exporter -gpus-acct -listen-addres ":9092"
+ExecStart=/opt/prometheus-slurm-exporter/bin/prometheus-slurm-exporter -gpus-acct -listen-address ":9092"
 Restart=always
 RestartSec=15
 
