@@ -17,3 +17,11 @@ function is_login() {
 function is_compute() {
     jetpack config slurm.role | grep -q 'execute'
 }
+
+function install_yq() {
+    # Install yq
+    if ! command -v yq &> /dev/null; then
+        wget -q "https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64" -O /usr/bin/yq
+        chmod 0755 /usr/bin/yq
+    fi
+}

@@ -50,6 +50,20 @@ function install_node_exporter() {
     systemctl start node_exporter
 }
 
+function add_scraper() {
+    INSTANCE_NAME=$(hostname)
+
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' /opt/prometheus/prometheus.yml $SPEC_FILE_ROOT/node_exporter.yml > tmp.yml
+    mv -vf tmp.yml /opt/prometheus/prometheus.yml
+
+    # update the configuration file
+    sed -i "s/instance_name/$INSTANCE_NAME/g" /opt/prometheus/prometheus.yml
+
+    systemctl restart prometheus
+}
+
 if is_scheduler || is_login ; then
     install_node_exporter
+    install_yq
+    add_scraper
 fi

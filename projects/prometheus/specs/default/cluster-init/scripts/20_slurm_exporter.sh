@@ -4,11 +4,12 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
 
 source "$SPEC_FILE_ROOT/common.sh" 
-GO_VERSION=1.22.4
-SLURM_EXPORTER_VERSION=v1.5.1
 
-function install_slurm_exporter()
+function install_rivosinc_slurm_exporter()
 {
+    GO_VERSION=1.22.4
+    SLURM_EXPORTER_VERSION=v1.5.1
+
     wget -q https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz
     rm -rf /usr/local/go && tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
     rm go$GO_VERSION.linux-amd64.tar.gz
@@ -17,13 +18,43 @@ function install_slurm_exporter()
 
     /usr/local/go/bin/go install github.com/rivosinc/prometheus-slurm-exporter@$SLURM_EXPORTER_VERSION
 
-    cp $SPEC_FILE_ROOT/prometheus-slurm-exporter.service /etc/systemd/system
+    cp $SPEC_FILE_ROOT/rivosinc-slurm-exporter.service /etc/systemd/system/prometheus-slurm-exporter.service
     systemctl daemon-reload
     systemctl enable prometheus-slurm-exporter
     systemctl start prometheus-slurm-exporter
-
 }
 
-# if is_scheduler ; then
-#     install_slurm_exporter
-# fi
+# Use the development branch as this is the one working for GPUs, however this exporter is not maintained anymore
+function install_vpenso_slurm_exporter()
+{
+
+    apt install -y golang-go
+    cd /opt
+    rm -rfv prometheus-slurm-exporter
+    git clone -b development https://github.com/vpenso/prometheus-slurm-exporter.git
+    cd prometheus-slurm-exporter
+    make
+
+    cp $SPEC_FILE_ROOT/vpenso-slurm-exporter.service /etc/systemd/system/prometheus-slurm-exporter.service
+    systemctl daemon-reload
+    systemctl enable prometheus-slurm-exporter
+    systemctl start prometheus-slurm-exporter
+}
+
+function add_scraper() {
+    INSTANCE_NAME=$(hostname)
+
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' /opt/prometheus/prometheus.yml $SPEC_FILE_ROOT/slurm_exporter.yml > tmp.yml
+    mv -vf tmp.yml /opt/prometheus/prometheus.yml
+
+    # update the configuration file
+    sed -i "s/instance_name/$INSTANCE_NAME/g" /opt/prometheus/prometheus.yml
+
+    systemctl restart prometheus
+}
+
+if is_scheduler ; then
+    install_vpenso_slurm_exporter
+    install_yq
+    add_scraper
+fi
