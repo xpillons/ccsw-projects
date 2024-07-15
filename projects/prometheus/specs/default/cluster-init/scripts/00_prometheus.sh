@@ -6,7 +6,32 @@ SPEC_FILE_ROOT="$script_dir/../files"
 source "$SPEC_FILE_ROOT/common.sh" 
 
 PROMETHEUS_VERSION=2.53.0
+PROM_CONFIG=/opt/prometheus/prometheus.yml
 JETPACK=/opt/cycle/jetpack/bin/jetpack
+
+get_subscription(){
+    subscription_name=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2021-02-01&format=text")
+
+    echo $subscription_name
+}
+
+get_cluster_name(){
+    cluster_name=$($JETPACK config cyclecloud.cluster.name)
+
+    echo $cluster_name
+}
+
+get_physical_host_name(){
+    KVP_PATH='/opt/azurehpc/tools/kvp_client'
+    if [ -f "$KVP_PATH" ]; then
+        HOST_NAME=$("$KVP_PATH" 3 | grep -i 'PhysicalHostName;' | awk -F 'Value:'  '{print $2}');
+    elif [ -f "/var/lib/hyperv/.kvp_pool_3" ]; then
+        HOST_NAME=$(strings /var/lib/hyperv/.kvp_pool_3 | grep -A1 PhysicalHostName | head -n 2 | tail -1)
+    else
+        HOST_NAME=physical_host_name
+    fi
+    echo $HOST_NAME
+}
 
 function install_prometheus() {
     # If /opt/prometheus doen't exist, download and extract prometheus
@@ -23,15 +48,20 @@ function install_prometheus() {
     cp -v $SPEC_FILE_ROOT/prometheus.service /etc/systemd/system/
 
     # copy the prometheus configuration file
-    cp -v $SPEC_FILE_ROOT/prometheus.yml /opt/prometheus/prometheus.yml
+    cp -v $SPEC_FILE_ROOT/prometheus.yml $PROM_CONFIG
 
     INGESTION_ENDPOINT=$($JETPACK config monitoring.ingestion_endpoint)
     IDENTITY_CLIENT_ID=$($JETPACK config monitoring.identity_client_id)
     INSTANCE_NAME=$(hostname)
     # update the configuration file
-    sed -i "s/instance_name/$INSTANCE_NAME/g" /opt/prometheus/prometheus.yml
-    sed -i "s@ingestion_endpoint@$INGESTION_ENDPOINT@" /opt/prometheus/prometheus.yml
-    sed -i "s/identity_client_id/$IDENTITY_CLIENT_ID/" /opt/prometheus/prometheus.yml
+    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
+    sed -i "s@ingestion_endpoint@$INGESTION_ENDPOINT@" $PROM_CONFIG
+    sed -i "s/identity_client_id/$IDENTITY_CLIENT_ID/" $PROM_CONFIG
+
+    sed -i -r "s/subscription_id/$SUBSCRIPTION_NAME/" $PROM_CONFIG
+    sed -i -r "s/cluster_name/$CLUSTER_NAME/" $PROM_CONFIG
+    sed -i -r "s/physical_host_name/$PHYS_HOST_NAME/" $PROM_CONFIG
+
 
     # Enable and start prometheus service
     systemctl daemon-reload
@@ -40,5 +70,8 @@ function install_prometheus() {
 }
 
 if is_scheduler || is_login || is_compute; then
+    PHYS_HOST_NAME=$(get_physical_host_name)
+    CLUSTER_NAME=$(get_cluster_name)
+    SUBSCRIPTION_NAME=$(get_subscription)
     install_prometheus
 fi
