@@ -39,6 +39,6 @@ function install_prometheus() {
     systemctl start prometheus
 }
 
-if is_scheduler || is_login ; then
+if is_scheduler || is_login || is_compute; then
     install_prometheus
 fi
