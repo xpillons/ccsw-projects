@@ -5,7 +5,7 @@ SPEC_FILE_ROOT="$script_dir/../files"
 
 source "$SPEC_FILE_ROOT/common.sh" 
 
-PROMETHEUS_VERSION=2.53.0
+PROMETHEUS_VERSION=2.53.1
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 JETPACK=/opt/cycle/jetpack/bin/jetpack
 

@@ -5,7 +5,7 @@ SPEC_FILE_ROOT="$script_dir/../files"
 
 source "$SPEC_FILE_ROOT/common.sh" 
 
-NODE_EXPORTER_VERSION=1.8.1
+NODE_EXPORTER_VERSION=1.8.2
 
 function install_node_exporter() {
     # If /opt/node_exporter doen't exist, download and extract node_exporter
