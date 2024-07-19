@@ -4,7 +4,6 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
 PROMETHEUS_VERSION=2.53.1
 PROM_CONFIG=/opt/prometheus/prometheus.yml
-JETPACK=/opt/cycle/jetpack/bin/jetpack
 
 source "$SPEC_FILE_ROOT/common.sh" 
 
@@ -19,7 +18,7 @@ get_subscription(){
 }
 
 get_cluster_name(){
-    cluster_name=$($JETPACK config cyclecloud.cluster.name)
+    cluster_name=$(jetpack config cyclecloud.cluster.name)
 
     echo $cluster_name
 }
@@ -53,8 +52,8 @@ function install_prometheus() {
     # copy the prometheus configuration file
     cp -v $SPEC_FILE_ROOT/prometheus.yml $PROM_CONFIG
 
-    INGESTION_ENDPOINT=$($JETPACK config monitoring.ingestion_endpoint)
-    IDENTITY_CLIENT_ID=$($JETPACK config monitoring.identity_client_id)
+    INGESTION_ENDPOINT=$(jetpack config monitoring.ingestion_endpoint)
+    IDENTITY_CLIENT_ID=$(jetpack config monitoring.identity_client_id)
     INSTANCE_NAME=$(hostname)
     # update the configuration file
     sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
