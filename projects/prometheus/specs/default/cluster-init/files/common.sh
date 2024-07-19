@@ -29,8 +29,8 @@ function install_yq() {
 function is_monitoring_enabled() {
     enabled_monitoring=$($JETPACK config monitoring.enabled | tr '[:upper:]' '[:lower:]')
     if [[ $enabled_monitoring == "true" ]]; then
-        return 0
-    else
         return 1
+    else
+        return 0
     fi
 }

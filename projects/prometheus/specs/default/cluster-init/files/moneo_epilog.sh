@@ -9,7 +9,8 @@ fi
 
 # need to create the directory for the job updater script to work
 mkdir -pv /tmp/moneo-worker
-$MONEO_ROOT/src/worker/jobIdUpdate.sh  "None" > "$log_file" 2>&1
+# Need to run as sudo to allow monitoring agent to be killed
+sudo $MONEO_ROOT/src/worker/jobIdUpdate.sh  "None" > "$log_file" 2>&1
 
 exit 0
 
