@@ -2,12 +2,16 @@
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
-
-source "$SPEC_FILE_ROOT/common.sh" 
 MONEO_ROOT=/opt/azurehpc/tools/Moneo
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 
-# If Mone is not present, exit silently
+source "$SPEC_FILE_ROOT/common.sh"
+
+if ! is_monitoring_enabled; then
+    exit 0
+fi
+
+# If Moneo is not present, exit silently
 if [ ! -d $MONEO_ROOT ]; then
     exit 0
 fi

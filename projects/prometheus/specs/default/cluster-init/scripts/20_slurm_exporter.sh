@@ -2,9 +2,12 @@
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
-
-source "$SPEC_FILE_ROOT/common.sh" 
 PROM_CONFIG=/opt/prometheus/prometheus.yml
+
+source "$SPEC_FILE_ROOT/common.sh"
+if ! is_monitoring_enabled; then
+    exit 0
+fi
 
 function install_rivosinc_slurm_exporter()
 {

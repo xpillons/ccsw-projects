@@ -25,3 +25,12 @@ function install_yq() {
         chmod 0755 /usr/bin/yq
     fi
 }
+
+function is_monitoring_enabled() {
+    enabled_monitoring=$($JETPACK config monitoring.enabled | tr '[:upper:]' '[:lower:]')
+    if [[ $enabled_monitoring == "true" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}

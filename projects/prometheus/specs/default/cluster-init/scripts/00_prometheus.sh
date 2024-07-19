@@ -2,12 +2,15 @@
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
-
-source "$SPEC_FILE_ROOT/common.sh" 
-
 PROMETHEUS_VERSION=2.53.1
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 JETPACK=/opt/cycle/jetpack/bin/jetpack
+
+source "$SPEC_FILE_ROOT/common.sh" 
+
+if ! is_monitoring_enabled; then
+    exit 0
+fi
 
 get_subscription(){
     subscription_name=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2021-02-01&format=text")
