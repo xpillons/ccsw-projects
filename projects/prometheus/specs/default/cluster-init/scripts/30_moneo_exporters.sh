@@ -5,7 +5,7 @@ SPEC_FILE_ROOT="$script_dir/../files"
 
 source "$SPEC_FILE_ROOT/common.sh" 
 MONEO_ROOT=/opt/azurehpc/tools/Moneo
-
+PROM_CONFIG=/opt/prometheus/prometheus.yml
 
 # If Mone is not present, exit silently
 if [ ! -d $MONEO_ROOT ]; then
@@ -30,11 +30,11 @@ function install_job_prolog_epilog()
 function add_scraper() {
     INSTANCE_NAME=$(hostname)
 
-    yq eval-all '. as $item ireduce ({}; . *+ $item)' /opt/prometheus/prometheus.yml $SPEC_FILE_ROOT/moneo_exporters.yml > tmp.yml
-    mv -vf tmp.yml /opt/prometheus/prometheus.yml
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $SPEC_FILE_ROOT/moneo_exporters.yml > tmp.yml
+    mv -vf tmp.yml $PROM_CONFIG
 
     # update the configuration file
-    sed -i "s/instance_name/$INSTANCE_NAME/g" /opt/prometheus/prometheus.yml
+    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
 
     systemctl restart prometheus
 }

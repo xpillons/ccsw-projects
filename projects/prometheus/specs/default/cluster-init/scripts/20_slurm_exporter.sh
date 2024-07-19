@@ -4,6 +4,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
 
 source "$SPEC_FILE_ROOT/common.sh" 
+PROM_CONFIG=/opt/prometheus/prometheus.yml
 
 function install_rivosinc_slurm_exporter()
 {
@@ -47,11 +48,11 @@ function install_vpenso_slurm_exporter()
 function add_scraper() {
     INSTANCE_NAME=$(hostname)
 
-    yq eval-all '. as $item ireduce ({}; . *+ $item)' /opt/prometheus/prometheus.yml $SPEC_FILE_ROOT/slurm_exporter.yml > tmp.yml
-    mv -vf tmp.yml /opt/prometheus/prometheus.yml
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $SPEC_FILE_ROOT/slurm_exporter.yml > tmp.yml
+    mv -vf tmp.yml $PROM_CONFIG
 
     # update the configuration file
-    sed -i "s/instance_name/$INSTANCE_NAME/g" /opt/prometheus/prometheus.yml
+    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
 
     systemctl restart prometheus
 }
