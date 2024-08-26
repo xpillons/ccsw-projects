@@ -1,0 +1,6 @@
+AdType = "Cloud.Project"
+Version = "1.0.1"
+ProjectType = "Application"
+Url = "https://github.com/cendio/cyclecloud-thinlinc/tree/cyclecloud"
+AutoUpgrade = false
+Name = "thinlink"
