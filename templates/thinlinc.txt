@@ -100,8 +100,7 @@ Autoscale = false
         ImageName = $LoginImageName
 
         [[[cluster-init cyclecloud/slurm:login:3.0.8]]]
-        [[[cluster-init cyclecloud/thinlinc:default]]]
-        Optional = false
+        [[[cluster-init cyclecloud/thinlinc:1.0.1]]]
 
         [[[configuration]]]
         autoscale.enabled = false
@@ -452,8 +451,8 @@ Order = 20
         Label = Login Node OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        DefaultValue = cendio:thinlinc:thinlinc-ubuntu-2204:latest
+        Config.Filter := Package in {"cendio:thinlinc:thinlinc-ubuntu-2204:latest", "cendio:thinlinc:thinlinc-almalinux-9:latest"}
 
         [[[parameter LoginClusterInitSpecs]]]
         Label = Login Cluster-Init
