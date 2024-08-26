@@ -1,6 +1,0 @@
-AdType = "Cloud.Project"
-Version = "1.0.1"
-ProjectType = "Application"
-Url = "https://github.com/xpillons/cyclecloud-thinlinc/releases/1.0.1"
-AutoUpgrade = false
-Name = "thinlinc"

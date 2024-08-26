@@ -100,7 +100,7 @@ Autoscale = false
         ImageName = $LoginImageName
 
         [[[cluster-init cyclecloud/slurm:login:3.0.8]]]
-        [[[cluster-init cyclecloud/thinlinc:default:1.0.1]]]
+        [[[cluster-init thinlinc:default:1.0.1]]]
 
         [[[configuration]]]
         autoscale.enabled = false
