@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Fetch thinlinc web access parameters
-enable_web=$(jetpack config thinlinc.enable_web False)
+enable_web=$(jetpack config thinlinc.enable_web True)
 thinlinc_web_port=$(jetpack config thinlinc.web_port 443)
 
 # Function to restart tlwebaccess service
