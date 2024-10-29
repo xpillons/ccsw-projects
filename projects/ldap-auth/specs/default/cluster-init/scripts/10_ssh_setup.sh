@@ -7,6 +7,6 @@ function configure_ssh_keys() {
 }
 
 # Configure SSH keys only on login nodes or scheduler node
-if is_login || is_scheduler ; then
+if ! is_compute ; then
     configure_ssh_keys
 fi
