@@ -41,7 +41,6 @@ configure_ood() {
 	sed -i -e "s/websocket\//${proxy_base_url}websocket\//" $TL_ROOT/modules/thinlinc/tlwebaccess/agent.py
 }
 
-}
 if [[ "$enable_web" == "True" ]]; then
 	# Update the listen_port
 	/opt/thinlinc/bin/tl-config /webaccess/listen_port=$thinlinc_web_port
