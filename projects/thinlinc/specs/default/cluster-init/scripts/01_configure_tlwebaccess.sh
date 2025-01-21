@@ -27,17 +27,17 @@ configure_ood() {
 	TL_ROOT=/opt/thinlinc
 	TL_HTML_TEMPLATES=$TL_ROOT/share/tlwebaccess/templates
 
-	proxy_base_url="\/rnode\/$(hostname)\/$thinlinc_web_port\/"
+	proxy_base_url="rnode\/$(hostname)\/$thinlinc_web_port\/"
 	# Replace action="/" with action="/rnode/$(hostname)/port/"
-	sed -i -e "s/action=\"\/\"/action=\"${proxy_base_url}\"/" $TL_HTML_TEMPLATES/main.tmpl
+	sed -i -e "s/action=\"\/\"/action=\"\/${proxy_base_url}\"/" $TL_HTML_TEMPLATES/main.tmpl
 
 	# Replace $qh($targetserver) with /rnode/$(hostname)/port/
-	sed -i -e "s/\$qh(\$targetserver)/${proxy_base_url}/" $TL_HTML_TEMPLATES/main.tmpl
+	sed -i -e "s/\$qh(\$targetserver)/\/${proxy_base_url}/" $TL_HTML_TEMPLATES/main.tmpl
 
 	# Replace href="/" with href="/rnode/$(hostname)/port/"
-	sed -i -e "s/href=\"\/\"/href=\"${proxy_base_url}\"/" $TL_HTML_TEMPLATES/vnc.tmpl
+	sed -i -e "s/href=\"\/\"/href=\"\/${proxy_base_url}\"/" $TL_HTML_TEMPLATES/vnc.tmpl
 
-	# Replace websocket with "/rnode/$(hostname)/port/websocket"
+	# Replace websocket with "rnode/$(hostname)/port/websocket"
 	sed -i -e "s/websocket\//${proxy_base_url}websocket\//" $TL_ROOT/modules/thinlinc/tlwebaccess/agent.py
 }
 
