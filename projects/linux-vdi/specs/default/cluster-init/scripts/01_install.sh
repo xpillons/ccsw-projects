@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 
 platform_family=$(jetpack config platform_family)
 platform=$(jetpack config platform)
@@ -21,3 +22,11 @@ case $platform in
         exit 0
         ;;
 esac
+
+# retrieve the number of GPUs
+NB_GPU=$(nvidia-smi -L | wc -l)
+# if NB_GPU greated than 0 the we need to configure /etc/X11/xorg.conf for the number of GPUs
+if [ $NB_GPU -gt 0 ]; then
+    nvidia-xconfig --enable-all-gpus --allow-empty-initial-configuration -c /etc/X11/xorg.conf --virtual=1920x1200 -s
+    sed -i '/Section "Device"/a\    Option         "HardDPMS" "false"' /etc/X11/xorg.conf
+fi
