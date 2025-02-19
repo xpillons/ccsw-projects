@@ -1,7 +1,7 @@
 #!/bin/bash
 MONEO_ROOT=/opt/azurehpc/tools/Moneo
 log_file=/var/log/slurmd/moneo_epilog.log
-# If Mone is not present, exit silently
+# If Moneo is not present, exit silently
 if [ ! -d $MONEO_ROOT ]; then
     echo "Moneo not present, exiting silently" >> "$log_file"
     exit 0

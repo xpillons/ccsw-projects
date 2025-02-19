@@ -9,7 +9,7 @@ if [ -z "$job_name" ]; then
     job_name='slurm_job'
 fi
 
-# If Mone is not present, exit silently
+# If Moneo is not present, exit silently
 if [ ! -d $MONEO_ROOT ]; then
     echo "Moneo not present, exiting silently" >> "$log_file"
     exit 0
