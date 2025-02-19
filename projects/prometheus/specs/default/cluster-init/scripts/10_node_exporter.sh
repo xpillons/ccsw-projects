@@ -66,7 +66,8 @@ function add_scraper() {
     systemctl restart prometheus
 }
 
-if is_scheduler || is_login || is_compute ; then
+# Only install node_exporter on scheduler and login nodes as on compute Moneo already takes care of it
+if is_scheduler || is_login ; then
     install_node_exporter
     install_yq
     add_scraper
