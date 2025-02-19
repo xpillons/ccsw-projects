@@ -2,7 +2,7 @@
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
-NODE_EXPORTER_VERSION=1.8.2
+NODE_EXPORTER_VERSION=1.9.0
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 
 source "$SPEC_FILE_ROOT/common.sh" 
@@ -66,7 +66,7 @@ function add_scraper() {
     systemctl restart prometheus
 }
 
-if is_scheduler || is_login ; then
+if is_scheduler || is_login || is_compute ; then
     install_node_exporter
     install_yq
     add_scraper
