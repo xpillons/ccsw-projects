@@ -2,7 +2,7 @@
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
-NODE_EXPORTER_VERSION=1.9.0
+NODE_EXPORTER_VERSION=1.9.1
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 
 source "$SPEC_FILE_ROOT/common.sh" 
