@@ -17,10 +17,12 @@ get_subscription(){
     echo $subscription_name
 }
 
+# Build a cluster name from the resource group and cluster name
 get_cluster_name(){
+    resource_group_name=$(jetpack config azure.metadata.compute.resourceGroupName)
     cluster_name=$(jetpack config cyclecloud.cluster.name)
 
-    echo $cluster_name
+    echo "$resource_group_name/$cluster_name"
 }
 
 get_physical_host_name(){
@@ -61,7 +63,7 @@ function install_prometheus() {
     sed -i "s/identity_client_id/$IDENTITY_CLIENT_ID/" $PROM_CONFIG
 
     sed -i -r "s/subscription_id/$SUBSCRIPTION_NAME/" $PROM_CONFIG
-    sed -i -r "s/cluster_name/$CLUSTER_NAME/" $PROM_CONFIG
+    sed -i -r "s|cluster_name|$CLUSTER_NAME|" $PROM_CONFIG
     sed -i -r "s/physical_host_name/$PHYS_HOST_NAME/" $PROM_CONFIG
 
 
