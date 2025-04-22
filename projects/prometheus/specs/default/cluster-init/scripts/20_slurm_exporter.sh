@@ -48,6 +48,32 @@ function install_vpenso_slurm_exporter()
     systemctl start prometheus-slurm-exporter
 }
 
+# This repo took over the vpenso one and is maintained
+function install_lcrownover_slurm_exporter()
+{
+    CONF_FILE=/etc/prometheus-slurm-exporter/env.conf
+
+    cd /opt
+    rm -rfv prometheus-slurm-exporter
+    cd prometheus-slurm-exporter
+
+
+    # Get a token for the hpcadmin user
+    token=$(scontrol token username=hpcadmin lifespan=31536000)
+
+    echo "SLURM_EXPORTER_LISTEN_ADDRESS=0.0.0.0:9092" > $CONF_FILE
+    echo "SLURM_EXPORTER_API_URL=http://localhost:6820" >> $CONF_FILE
+    echo "SLURM_EXPORTER_API_USER=hpcadmin" >> $CONF_FILE
+    echo "SLURM_EXPORTER_API_TOKEN=$token" >> $CONF_FILE
+    echo "SLURM_EXPORTER_ENABLE_TLS=false" >> $CONF_FILE
+
+    chmod 600 $CONF_FILE
+    cp $SPEC_FILE_ROOT/lcrownover-slurm-exporter.service /etc/systemd/system/prometheus-slurm-exporter.service
+    systemctl daemon-reload
+    systemctl enable prometheus-slurm-exporter
+    systemctl start prometheus-slurm-exporter
+}
+
 function add_scraper() {
     INSTANCE_NAME=$(hostname)
 
