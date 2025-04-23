@@ -21,6 +21,9 @@ install_dcgm_exporter() {
     CUDA_VERSION=$(nvidia-smi | sed -E -n 's/.*CUDA Version: ([0-9]+)[.].*/\1/p')
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --install-recommends datacenter-gpu-manager-4-cuda${CUDA_VERSION}
 
+    systemctl daemon-reload
+    systemctl restart nvidia-dcgm.service
+    
     # Run DCGM Exporter
     docker run -d --gpus all --cap-add SYS_ADMIN --rm -p 9400:9400 nvcr.io/nvidia/k8s/dcgm-exporter:4.2.0-4.1.0-ubuntu22.04
 }
