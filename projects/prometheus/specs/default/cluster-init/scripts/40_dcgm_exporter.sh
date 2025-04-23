@@ -28,7 +28,7 @@ install_dcgm_exporter() {
 function add_scraper() {
     INSTANCE_NAME=$(hostname)
 
-    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $SPEC_FILE_ROOT/dcgm_exporters.yml > tmp.yml
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $SPEC_FILE_ROOT/dcgm_exporter.yml > tmp.yml
     mv -vf tmp.yml $PROM_CONFIG
 
     # update the configuration file
