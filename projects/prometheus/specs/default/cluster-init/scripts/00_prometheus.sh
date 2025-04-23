@@ -12,9 +12,9 @@ if ! is_monitoring_enabled; then
 fi
 
 get_subscription(){
-    subscription_name=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2021-02-01&format=text")
+    subscription_id=$(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2021-02-01&format=text")
 
-    echo $subscription_name
+    echo $subscription_id
 }
 
 # Build a cluster name from the resource group and cluster name
@@ -62,7 +62,7 @@ function install_prometheus() {
     sed -i "s@ingestion_endpoint@$INGESTION_ENDPOINT@" $PROM_CONFIG
     sed -i "s/identity_client_id/$IDENTITY_CLIENT_ID/" $PROM_CONFIG
 
-    sed -i -r "s/subscription_id/$SUBSCRIPTION_NAME/" $PROM_CONFIG
+    sed -i -r "s/subscription_id/$SUBSCRIPTION_ID/" $PROM_CONFIG
     sed -i -r "s|cluster_name|$CLUSTER_NAME|" $PROM_CONFIG
     sed -i -r "s/physical_host_name/$PHYS_HOST_NAME/" $PROM_CONFIG
 
@@ -75,8 +75,8 @@ function install_prometheus() {
 
 # Always install prometheus
 #if is_scheduler || is_login || is_compute; then
-    PHYS_HOST_NAME=$(get_physical_host_name)
-    CLUSTER_NAME=$(get_cluster_name)
-    SUBSCRIPTION_NAME=$(get_subscription)
-    install_prometheus
+PHYS_HOST_NAME=$(get_physical_host_name)
+CLUSTER_NAME=$(get_cluster_name)
+SUBSCRIPTION_ID=$(get_subscription)
+install_prometheus
 #fi
