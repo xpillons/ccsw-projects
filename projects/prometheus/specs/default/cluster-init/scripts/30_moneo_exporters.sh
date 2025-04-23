@@ -1,5 +1,4 @@
 #!/bin/bash
-exit 0
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
@@ -45,7 +44,7 @@ function add_scraper() {
 }
 
 if is_compute ; then
-    install_job_prolog_epilog
+    #install_job_prolog_epilog
     start_moneo
     install_yq
     add_scraper
