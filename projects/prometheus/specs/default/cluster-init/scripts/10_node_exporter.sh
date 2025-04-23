@@ -44,11 +44,11 @@ function install_node_exporter() {
     # Copy node exporter configuration file
     # Customize the node_exporter configuration file based on node type
     # Compute nodes will have reduced metrics
-    #cp -v $SPEC_FILE_ROOT/sysconfig.node_exporter /etc/sysconfig/node_exporter
+    cp -v $SPEC_FILE_ROOT/sysconfig.node_exporter /etc/sysconfig/node_exporter
 
     # Create textfile_collector directory
-    #mkdir -pv /var/lib/node_exporter/textfile_collector
-    #chown node_exporter:node_exporter /var/lib/node_exporter/textfile_collector
+    mkdir -pv /var/lib/node_exporter/textfile_collector
+    chown node_exporter:node_exporter /var/lib/node_exporter/textfile_collector
 
     # Enable and start node exporter service
     systemctl daemon-reload
