@@ -73,9 +73,10 @@ function install_prometheus() {
     systemctl start prometheus
 }
 
-if is_scheduler || is_login || is_compute; then
+# Always install prometheus
+#if is_scheduler || is_login || is_compute; then
     PHYS_HOST_NAME=$(get_physical_host_name)
     CLUSTER_NAME=$(get_cluster_name)
     SUBSCRIPTION_NAME=$(get_subscription)
     install_prometheus
-fi
+#fi

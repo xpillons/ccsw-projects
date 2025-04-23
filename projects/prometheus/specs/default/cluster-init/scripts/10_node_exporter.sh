@@ -42,11 +42,13 @@ function install_node_exporter() {
     mkdir -pv /etc/sysconfig
 
     # Copy node exporter configuration file
-    cp -v $SPEC_FILE_ROOT/sysconfig.node_exporter /etc/sysconfig/node_exporter
+    # Customize the node_exporter configuration file based on node type
+    # Compute nodes will have reduced metrics
+    #cp -v $SPEC_FILE_ROOT/sysconfig.node_exporter /etc/sysconfig/node_exporter
 
     # Create textfile_collector directory
-    mkdir -pv /var/lib/node_exporter/textfile_collector
-    chown node_exporter:node_exporter /var/lib/node_exporter/textfile_collector
+    #mkdir -pv /var/lib/node_exporter/textfile_collector
+    #chown node_exporter:node_exporter /var/lib/node_exporter/textfile_collector
 
     # Enable and start node exporter service
     systemctl daemon-reload
@@ -66,9 +68,10 @@ function add_scraper() {
     systemctl restart prometheus
 }
 
-# Only install node_exporter on scheduler and login nodes as on compute Moneo already takes care of it
-if is_scheduler || is_login ; then
-    install_node_exporter
-    install_yq
-    add_scraper
-fi
+
+# Always install node_exporter
+#if is_scheduler || is_login ; then
+install_node_exporter
+install_yq
+add_scraper
+#fi
