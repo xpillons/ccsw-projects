@@ -1,4 +1,5 @@
 #!/bin/bash
+exit 0
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPEC_FILE_ROOT="$script_dir/../files"
