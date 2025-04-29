@@ -24,9 +24,7 @@ install_dcgm_exporter() {
     systemctl daemon-reload
     systemctl restart nvidia-dcgm.service
     
-    # Run DCGM Exporter
-    
-    
+    # Run DCGM Exporter in a container
     docker run -v $SPEC_FILE_ROOT/custom_dcgm_counters.csv:/etc/dcgm-exporter/custom-counters.csv \
             -d --gpus all --cap-add SYS_ADMIN --rm -p 9400:9400 \
             nvcr.io/nvidia/k8s/dcgm-exporter:4.2.0-4.1.0-ubuntu22.04 -f /etc/dcgm-exporter/custom-counters.csv
