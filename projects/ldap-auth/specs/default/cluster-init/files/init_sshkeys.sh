@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Only do this for uid > 1000 - CycleCloud is uid 1000
+# Only do this for uid >= 1000 - CycleCloud is uid 1000
 if [ $(id -u) -le 1000 ]; then
     return
 fi
