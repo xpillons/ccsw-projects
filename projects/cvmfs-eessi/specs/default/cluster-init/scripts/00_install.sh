@@ -1,4 +1,6 @@
 #!/bin/bash
+# See https://techcommunity.microsoft.com/blog/azurehighperformancecomputingblog/using-gromacs-through-eessi-on-nc-a100-v4/4423933
+
 set -eo pipefail
 read_os()
 {
@@ -30,5 +32,6 @@ esac
 
 # configure CernVM-FS (no proxy, 10GB quota for CernVM-FS cache)
 bash -c "echo 'CVMFS_HTTP_PROXY=DIRECT' > /etc/cvmfs/default.local"
+bash -c "echo 'CVMFS_CLIENT_PROFILE="single"' > /etc/cvmfs/default.local"
 bash -c "echo 'CVMFS_QUOTA_LIMIT=10000' >> /etc/cvmfs/default.local"
 cvmfs_config setup
