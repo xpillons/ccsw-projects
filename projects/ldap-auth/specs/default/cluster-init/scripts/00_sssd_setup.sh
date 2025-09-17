@@ -25,6 +25,8 @@ platform_family=$(jetpack config platform_family)
 platform=$(jetpack config platform)
 platform_version=$(jetpack config platform_version)
 
+# Disable SSH password authentication
+sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
 
 #supported platforms RHEL 8/9, AlmaLinux 8/9, SLES 15, Ubuntu 20/22
 # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
