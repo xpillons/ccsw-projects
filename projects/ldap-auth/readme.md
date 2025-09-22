@@ -13,10 +13,11 @@ This project configures LDAP authentication for CycleCloud clusters using SSSD. 
 - CycleCloud version 8.0 or higher.
 
 ## Installation
-From the CycleCloud VM
+SSH on the CycleCloud VM, and change to `su`
 
 1. Clone the repository and navigate to the project directory:
 ```bash
+cd /opt/ccw
 git clone https://github.com/xpillons/ccsw-projects.git
 cd ccsw-projects/projects/ldap-auth
 ```
