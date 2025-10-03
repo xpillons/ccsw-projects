@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 set -e
 
 #### 
@@ -16,6 +15,7 @@ LDAP_default_bind_dn="CN=Linux Binder,CN=Users,DC=hpc,DC=azure" # default bind D
 BIND_DN_PASSWORD="Service account password" # default bind DN password. This is obfuscated in the sssd.conf file
 TLS_reqcert="allow" # what checks to perform on server certificates in a TLS session. Supported values are never, allow, try, demand, hard
 ID_mapping="True" # SSSD should attempt to map user and group IDs from the ldap_user_objectsid and ldap_group_objectsid attributes instead of relying on ldap_user_uid_number and ldap_group_gid_number.
+HPC_ADMIN_GROUP="HPC Admins" # LDAP group that will be granted sudo access on the nodes.
 ENUMERATE="True" # determines if a domain can be enumerated.
 HOME_DIR="/shared/home" # user home directory for ldap users.
 HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
@@ -107,5 +107,8 @@ if [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "s
     systemctl enable --now oddjobd.service
     authselect select sssd with-mkhomedir --force # select sssd profile with auto make home dir on login and force overwrite files if it has been setup before
 fi
+
+# Add LDAP HPC admin group to sudoers.d
+echo "\"%$HPC_ADMIN_GROUP\" ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hpc_admins
 
 systemctl restart sssd.service
