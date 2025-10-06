@@ -28,6 +28,14 @@ platform_version=$(jetpack config platform_version)
 # Disable SSH password authentication
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
 
+# Disable SSH host key checking for passwordless SSH between nodes, because the underlying server may change but the IP remains the same.
+cat <<EOF >/etc/ssh/ssh_config
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOF
+
+
 #supported platforms RHEL 8/9, AlmaLinux 8/9, SLES 15, Ubuntu 20/22
 # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
