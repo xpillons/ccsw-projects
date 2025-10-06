@@ -7,7 +7,7 @@ set -e
 # Alternativley the sssd.conf may be edited directly, this is useful for more complex setups.
 # The BIND_DN refers to the read only service account that is used for retrieving data from the LDAP server.
 ####
-CACHE_Credentials="False" # Determines if user credentials are also cached in the local LDB cache
+CACHE_Credentials="True" # Determines if user credentials are also cached in the local LDB cache. True by default for tuning.
 LDAP_URI="ldap://172.20.90.4" # comma-separated list of URIs of the LDAP servers to which SSSD should connect in the order of preference.
 LDAP_search_base="dc=hpc,dc=azure" # default base DN to use for performing LDAP user operations. eg searching for users
 LDAP_Schema="AD" # Schema Type in use on the target LDAP server. supported values are rfc2307, rfc2307bis, IPA, AD
@@ -16,7 +16,7 @@ BIND_DN_PASSWORD="Service account password" # default bind DN password. This is 
 TLS_reqcert="allow" # what checks to perform on server certificates in a TLS session. Supported values are never, allow, try, demand, hard
 ID_mapping="True" # SSSD should attempt to map user and group IDs from the ldap_user_objectsid and ldap_group_objectsid attributes instead of relying on ldap_user_uid_number and ldap_group_gid_number.
 HPC_ADMIN_GROUP="HPC Admins" # LDAP group that will be granted sudo access on the nodes.
-ENUMERATE="True" # determines if a domain can be enumerated.
+ENUMERATE="False" # determines if a domain can be enumerated. Default to False for performance reasons.
 HOME_DIR="/shared/home" # user home directory for ldap users.
 HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
 
@@ -28,7 +28,7 @@ platform_version=$(jetpack config platform_version)
 # Disable SSH password authentication
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
 
-# Disable SSH host key checking for passwordless SSH between nodes, because the underlying server may change but the IP remains the same.
+# Disable SSH host key checking because the underlying server may change but the IP remains the same.
 cat <<EOF >/etc/ssh/ssh_config
 Host *
     StrictHostKeyChecking no
