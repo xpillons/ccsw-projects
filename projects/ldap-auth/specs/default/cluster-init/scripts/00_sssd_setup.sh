@@ -7,6 +7,9 @@ set -e
 # Alternativley the sssd.conf may be edited directly, this is useful for more complex setups.
 # The BIND_DN refers to the read only service account that is used for retrieving data from the LDAP server.
 ####
+USE_KEYVAULT="False" # If True the BIND_DN_PASSWORD is retrieved from Azure Keyvault. If False the password is stored in plain text in this script.
+KEYVAULT_NAME="mykeyvault" # Name of the Azure Keyvault where the BIND_DN_PASSWORD secret is stored.
+KEYVAULT_SECRET_NAME="ldap-bind-password" # Name of the secret in the Keyvault where the BIND_DN_PASSWORD is stored.
 CACHE_Credentials="True" # Determines if user credentials are also cached in the local LDB cache. True by default for tuning.
 LDAP_URI="ldap://172.20.90.4" # comma-separated list of URIs of the LDAP servers to which SSSD should connect in the order of preference.
 LDAP_search_base="dc=hpc,dc=azure" # default base DN to use for performing LDAP user operations. eg searching for users
@@ -20,6 +23,17 @@ ENUMERATE="False" # determines if a domain can be enumerated. Default to False f
 HOME_DIR="/shared/home" # user home directory for ldap users.
 HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
 
+# If Keyvault is being used retrieve the BIND_DN_PASSWORD from the keyvault
+if [ "${USE_KEYVAULT,,}" == "true" ]; then
+    # Logon using the VM identity
+    az login --identity
+    echo "Retrieving LDAP bind password from Keyvault"
+    BIND_DN_PASSWORD=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" --query value -o tsv)
+    if [ -z "$BIND_DN_PASSWORD" ]; then
+        echo "Error: Unable to retrieve LDAP bind password from Keyvault"
+        exit 1
+    fi
+fi
 ### node config values from OHAI
 platform_family=$(jetpack config platform_family)
 platform=$(jetpack config platform)
