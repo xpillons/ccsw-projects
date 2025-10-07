@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# if CYCLECLOUD_SPEC_PATH is not set use the script directory as the base path
+if [ -z "$CYCLECLOUD_SPEC_PATH" ]; then
+    export CYCLECLOUD_SPEC_PATH="$script_dir/.."
+fi
+
 #### 
 # The below settings must be edited by the user.
 # The settings are the configuration values for the sssd.conf file in ../files.
@@ -8,6 +14,7 @@ set -e
 # The BIND_DN refers to the read only service account that is used for retrieving data from the LDAP server.
 ####
 USE_KEYVAULT="False" # If True the BIND_DN_PASSWORD is retrieved from Azure Keyvault. If False the password is stored in plain text in this script.
+CLIENT_ID="your-client-id" # Client ID of the assigned managed identity used to access the Keyvault
 KEYVAULT_NAME="mykeyvault" # Name of the Azure Keyvault where the BIND_DN_PASSWORD secret is stored.
 KEYVAULT_SECRET_NAME="ldap-bind-password" # Name of the secret in the Keyvault where the BIND_DN_PASSWORD is stored.
 CACHE_Credentials="True" # Determines if user credentials are also cached in the local LDB cache. True by default for tuning.
@@ -26,13 +33,16 @@ HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
 # If Keyvault is being used retrieve the BIND_DN_PASSWORD from the keyvault
 if [ "${USE_KEYVAULT,,}" == "true" ]; then
     # Logon using the VM identity
-    az login --identity
+    echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
+    az login --identity --client-id "$CLIENT_ID" || echo "Error: az login failed"; exit 1
     echo "Retrieving LDAP bind password from Keyvault"
     BIND_DN_PASSWORD=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" --query value -o tsv)
     if [ -z "$BIND_DN_PASSWORD" ]; then
         echo "Error: Unable to retrieve LDAP bind password from Keyvault"
         exit 1
     fi
+else
+    echo "Do not use KeyVault, using password from script"
 fi
 ### node config values from OHAI
 platform_family=$(jetpack config platform_family)
@@ -53,7 +63,7 @@ EOF
 #supported platforms RHEL 8/9, AlmaLinux 8/9, SLES 15, Ubuntu 20/22
 # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
-    DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils dos2unix
+    DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils
     TLS_CERT_Location="/etc/ssl/certs/ca-certificates.crt"
 
 fi
@@ -62,7 +72,7 @@ if [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform
     if [ "$platform" == "almalinux" ]; then
         yum install epel-release -y
     fi
-    yum install -y sssd sssd-tools sssd-ldap openldap-clients dos2unix oddjob-mkhomedir
+    yum install -y sssd sssd-tools sssd-ldap openldap-clients oddjob-mkhomedir
     TLS_CERT_Location="/etc/pki/tls/certs/ca-bundle.crt"
 fi
 
@@ -77,7 +87,7 @@ if [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "s
     zypper addrepo -f https://download.opensuse.org/repositories/home:lemmy04:idm/"$platform_version"/home:lemmy04:idm.repo
     zypper --gpg-auto-import-keys refresh 
 
-    zypper install -y sssd sssd-tools sssd-ldap openldap2-client dos2unix authselect oddjob-mkhomedir
+    zypper install -y sssd sssd-tools sssd-ldap openldap2-client  authselect oddjob-mkhomedir
     TLS_CERT_Location="/var/lib/ca-certificates/ca-bundle.pem"
 fi
 
@@ -97,7 +107,6 @@ sed -i "s#HOME_DIR#$HOME_DIR#g" /etc/sssd/sssd.conf
 
 echo -n $BIND_DN_PASSWORD | sss_obfuscate --domain default -s #obfuscate the bind dn password
 
-dos2unix /etc/sssd/sssd.conf # convert to unix format
 chmod 600 /etc/sssd/sssd.conf # permissions required by sssd
 chown root:root /etc/sssd/sssd.conf # permissions required by sssd
 

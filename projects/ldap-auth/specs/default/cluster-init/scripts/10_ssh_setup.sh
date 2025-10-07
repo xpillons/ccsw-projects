@@ -1,5 +1,11 @@
 #!/bin/bash
 set -e
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# if CYCLECLOUD_SPEC_PATH is not set use the script directory as the base path
+if [ -z "$CYCLECLOUD_SPEC_PATH" ]; then
+    export CYCLECLOUD_SPEC_PATH="$script_dir/.."
+fi
+
 source "$CYCLECLOUD_SPEC_PATH/files/common.sh" 
 
 function configure_ssh_keys() {
