@@ -34,7 +34,7 @@ HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
 if [ "${USE_KEYVAULT,,}" == "true" ]; then
     # Logon using the VM identity
     echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
-    az login --identity --client-id "$CLIENT_ID" || echo "Error: az login failed"; exit 1
+    az login --identity --client-id "$CLIENT_ID" || (echo "Error: az login failed"; exit 1)
     echo "Retrieving LDAP bind password from Keyvault"
     BIND_DN_PASSWORD=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" --query value -o tsv)
     if [ -z "$BIND_DN_PASSWORD" ]; then
