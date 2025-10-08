@@ -67,11 +67,16 @@ if [ "${USE_KEYVAULT,,}" == "true" ]; then
     echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
     az login --identity --client-id "$CLIENT_ID" || (echo "Error: az login failed"; exit 1)
     echo "Retrieving LDAP bind password from Keyvault"
-    BIND_DN_PASSWORD=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" --query value -o tsv)
-    if [ -z "$BIND_DN_PASSWORD" ]; then
+    SECRET_JSON=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" -o json)
+    BIND_DN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.value')
+    SECRET_UPDATED=$(echo "$SECRET_JSON" | jq -r '.attributes.updated')
+    
+    if [ -z "$BIND_DN_PASSWORD" ] || [ "$BIND_DN_PASSWORD" == "null" ]; then
         echo "Error: Unable to retrieve LDAP bind password from Keyvault"
         exit 1
     fi
+    
+    echo "Secret last updated: $(date -d @$SECRET_UPDATED 2>/dev/null || date -r $SECRET_UPDATED 2>/dev/null || echo $SECRET_UPDATED)"
 else
     echo "Do not use KeyVault, using password from script"
 fi
