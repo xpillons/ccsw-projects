@@ -75,8 +75,10 @@ if [ "${USE_KEYVAULT,,}" == "true" ]; then
         echo "Error: Unable to retrieve LDAP bind password from Keyvault"
         exit 1
     fi
-    
-    echo "Secret last updated: $(date -d @$SECRET_UPDATED 2>/dev/null || date -r $SECRET_UPDATED 2>/dev/null || echo $SECRET_UPDATED)"
+
+    echo "Secret last updated: $SECRET_UPDATED"
+    # keep the last updated value in a marker file
+    echo "$SECRET_UPDATED" > $CYCLECLOUD_SPEC_PATH/$KEYVAULT_SECRET_NAME_last_updated.txt
 else
     echo "Do not use KeyVault, using password from script"
 fi
