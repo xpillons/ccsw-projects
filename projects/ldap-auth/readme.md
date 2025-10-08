@@ -5,7 +5,8 @@ This project configures LDAP authentication for CycleCloud clusters using SSSD. 
 - Configures SSH for secure access.
 - Supports multiple LDAP servers for redundancy.
 - Automatically updates SSSD configuration on cluster start.
-- Disables SSH password authentication
+- Disables SSH password authentication.
+- Add a LDAP HPC Admin group to the sudoers file.
 - Can use KeyVault to retrieve the LDAP bind password securely.
 
 ## Prerequisites

@@ -6,11 +6,16 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 if [ -z "$CYCLECLOUD_SPEC_PATH" ]; then
     export CYCLECLOUD_SPEC_PATH="$script_dir/.."
 fi
+# Read configuration from JSON file
+CONFIG_FILE="$CYCLECLOUD_SPEC_PATH/files/ldap-config.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file $CONFIG_FILE not found"
+    exit 1
+fi
 
-#### 
-# The below settings are read from the ldap-config.json file in ../files.
-# Alternatively the sssd.conf may be edited directly, this is useful for more complex setups.
-####
+# allow access to ldap-config.json only to root and cyclecloud user
+chown root:cyclecloud "$CONFIG_FILE"
+chmod 640 "$CONFIG_FILE"
 
 # Check if jq is installed, install it if not
 if ! command -v jq &> /dev/null; then
@@ -27,12 +32,10 @@ if ! command -v jq &> /dev/null; then
     fi
 fi
 
-# Read configuration from JSON file
-CONFIG_FILE="$CYCLECLOUD_SPEC_PATH/files/ldap-config.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: Configuration file $CONFIG_FILE not found"
-    exit 1
-fi
+#### 
+# The below settings are read from the ldap-config.json file in ../files.
+# Alternatively the sssd.conf may be edited directly, this is useful for more complex setups.
+####
 
 # Parse JSON configuration
 USE_KEYVAULT=$(jq -r '.useKeyvault' "$CONFIG_FILE")
