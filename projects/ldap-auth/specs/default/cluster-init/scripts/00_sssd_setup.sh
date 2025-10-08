@@ -8,30 +8,58 @@ if [ -z "$CYCLECLOUD_SPEC_PATH" ]; then
 fi
 
 #### 
-# The below settings must be edited by the user.
-# The settings are the configuration values for the sssd.conf file in ../files.
-# Alternativley the sssd.conf may be edited directly, this is useful for more complex setups.
-# The BIND_DN refers to the read only service account that is used for retrieving data from the LDAP server.
+# The below settings are read from the ldap-config.json file in ../files.
+# Alternatively the sssd.conf may be edited directly, this is useful for more complex setups.
 ####
-USE_KEYVAULT="False" # If True the BIND_DN_PASSWORD is retrieved from Azure Keyvault. If False the password is stored in plain text in this script.
-CLIENT_ID="your-client-id" # Client ID of the assigned managed identity used to access the Keyvault
-KEYVAULT_NAME="mykeyvault" # Name of the Azure Keyvault where the BIND_DN_PASSWORD secret is stored.
-KEYVAULT_SECRET_NAME="ldap-bind-password" # Name of the secret in the Keyvault where the BIND_DN_PASSWORD is stored.
-CACHE_Credentials="True" # Determines if user credentials are also cached in the local LDB cache. True by default for tuning.
-LDAP_URI="ldap://172.20.90.4" # comma-separated list of URIs of the LDAP servers to which SSSD should connect in the order of preference.
-LDAP_search_base="dc=hpc,dc=azure" # default base DN to use for performing LDAP user operations. eg searching for users
-LDAP_Schema="AD" # Schema Type in use on the target LDAP server. supported values are rfc2307, rfc2307bis, IPA, AD
-LDAP_default_bind_dn="CN=Linux Binder,CN=Users,DC=hpc,DC=azure" # default bind DN to use for performing LDAP operations.
-BIND_DN_PASSWORD="Service account password" # default bind DN password. This is obfuscated in the sssd.conf file
-TLS_reqcert="allow" # what checks to perform on server certificates in a TLS session. Supported values are never, allow, try, demand, hard
-ID_mapping="True" # SSSD should attempt to map user and group IDs from the ldap_user_objectsid and ldap_group_objectsid attributes instead of relying on ldap_user_uid_number and ldap_group_gid_number.
-HPC_ADMIN_GROUP="HPC Admins" # LDAP group that will be granted sudo access on the nodes.
-ENUMERATE="False" # determines if a domain can be enumerated. Default to False for performance reasons.
-HOME_DIR="/shared/home" # user home directory for ldap users.
+
+# Check if jq is installed, install it if not
+if ! command -v jq &> /dev/null; then
+    echo "jq not found, installing..."
+    platform_family=$(jetpack config platform_family)
+    platform=$(jetpack config platform)
+    
+    if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
+        DEBIAN_FRONTEND=noninteractive apt update && apt install -y jq
+    elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 
+        yum install -y jq
+    elif [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
+        zypper install -y jq
+    fi
+fi
+
+# Read configuration from JSON file
+CONFIG_FILE="$CYCLECLOUD_SPEC_PATH/files/ldap-config.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file $CONFIG_FILE not found"
+    exit 1
+fi
+
+# Parse JSON configuration
+USE_KEYVAULT=$(jq -r '.useKeyvault' "$CONFIG_FILE")
+CLIENT_ID=$(jq -r '.clientId' "$CONFIG_FILE")
+KEYVAULT_NAME=$(jq -r '.keyvaultName' "$CONFIG_FILE")
+KEYVAULT_SECRET_NAME=$(jq -r '.keyvaultSecretName' "$CONFIG_FILE")
+CACHE_Credentials=$(jq -r '.cacheCredentials' "$CONFIG_FILE")
+LDAP_URI=$(jq -r '.ldapUri' "$CONFIG_FILE")
+LDAP_search_base=$(jq -r '.ldapSearchBase' "$CONFIG_FILE")
+LDAP_Schema=$(jq -r '.ldapSchema' "$CONFIG_FILE")
+LDAP_default_bind_dn=$(jq -r '.ldapDefaultBindDn' "$CONFIG_FILE")
+BIND_DN_PASSWORD=$(jq -r '.bindDnPassword' "$CONFIG_FILE")
+TLS_reqcert=$(jq -r '.tlsReqcert' "$CONFIG_FILE")
+ID_mapping=$(jq -r '.idMapping' "$CONFIG_FILE")
+HPC_ADMIN_GROUP=$(jq -r '.hpcAdminGroup' "$CONFIG_FILE")
+ENUMERATE=$(jq -r '.enumerate' "$CONFIG_FILE")
+HOME_DIR=$(jq -r '.homeDir' "$CONFIG_FILE")
 HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
 
 # If Keyvault is being used retrieve the BIND_DN_PASSWORD from the keyvault
 if [ "${USE_KEYVAULT,,}" == "true" ]; then
+    # Install Azure CLI using the script install-azcli.sh if not already installed
+    if ! command -v az &> /dev/null; then
+        echo "Azure CLI not found, installing..."
+        chmod +x "$CYCLECLOUD_SPEC_PATH/files/install-azcli.sh"
+        bash "$CYCLECLOUD_SPEC_PATH/files/install-azcli.sh"
+    fi
     # Logon using the VM identity
     echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
     az login --identity --client-id "$CLIENT_ID" || (echo "Error: az login failed"; exit 1)
@@ -65,7 +93,6 @@ EOF
 if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
     DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils
     TLS_CERT_Location="/etc/ssl/certs/ca-certificates.crt"
-
 fi
 
 if [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 

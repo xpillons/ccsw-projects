@@ -6,6 +6,7 @@ This project configures LDAP authentication for CycleCloud clusters using SSSD. 
 - Supports multiple LDAP servers for redundancy.
 - Automatically updates SSSD configuration on cluster start.
 - Disables SSH password authentication
+- Can use KeyVault to retrieve the LDAP bind password securely.
 
 ## Prerequisites
 - A running CycleCloud instance.
@@ -22,8 +23,11 @@ git clone https://github.com/xpillons/ccsw-projects.git
 cd ccsw-projects/projects/ldap-auth
 ```
 
-2. Update file `specs/default/cluster-init/scripts/00_sssd_setup.sh` with your LDAP server details.
-
+2. Copy the example configuration file and edit it to match your LDAP server settings:
+```bash
+cp specs/default/cluster-init/files/ldap-config.json.example specs/default/cluster-init/files/ldap-config.json
+```
+Edit `ldap-config.json` to set your LDAP server details, base DN, bind DN, and other relevant settings. 
 
 3. Upload the project to your CycleCloud instance:
 ```bash
@@ -48,6 +52,7 @@ sudo su - <ldap-username>
 - Ensure that the LDAP server is reachable from the CycleCloud nodes.
 - Verify that the LDAP user exists and has the correct permissions.
 - Ensure that the SSH configuration is correct and that password authentication is disabled if required.
+- If using KeyVault, ensure that the Managed Identity assigned to the CycleCloud VM used to retrieve the secret, has the role `Key Vault Secrets User` assigned in the KeyVault RBAC.
 
 You can use the ldapsearch command to verify connectivity to the LDAP server, replace `<uri>` and the bind DN and password with your LDAP server details
 
