@@ -104,10 +104,10 @@ handle_keyvault_auth() {
 
         echo "Secret last updated: $SECRET_UPDATED"
         # keep the last updated value in a marker file
-        echo "$SECRET_UPDATED" > "$CYCLECLOUD_SPEC_PATH/${KEYVAULT_SECRET_NAME}_last_updated.txt"
+        echo "$SECRET_UPDATED" > "$CYCLECLOUD_SPEC_PATH/files/${KEYVAULT_SECRET_NAME}_last_updated.txt"
         export BIND_DN_PASSWORD
     else
-        echo "Do not use KeyVault, using password from script"
+        echo "Do not use KeyVault, using password from parameter file"
     fi
 }
 
