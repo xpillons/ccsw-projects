@@ -84,11 +84,12 @@ load_configuration() {
     ENUMERATE=$(jq -r '.enumerate' "$CONFIG_FILE")
     HOME_DIR=$(jq -r '.homeDir' "$CONFIG_FILE")
     HOME_DIR_TOP=$(echo "$HOME_DIR" | awk -F/ '{print FS $2}')
+    SETUP_CRON=$(jq -r '.setupCron' "$CONFIG_FILE")
     
     # Export variables for use in other functions
     export USE_KEYVAULT CLIENT_ID KEYVAULT_NAME KEYVAULT_SECRET_NAME CACHE_Credentials
     export LDAP_URI LDAP_search_base LDAP_Schema LDAP_default_bind_dn BIND_DN_PASSWORD
-    export TLS_reqcert ID_mapping HPC_ADMIN_GROUP ENUMERATE HOME_DIR HOME_DIR_TOP
+    export TLS_reqcert ID_mapping HPC_ADMIN_GROUP ENUMERATE HOME_DIR HOME_DIR_TOP SETUP_CRON
 }
 
 # Handle Azure Key Vault authentication and secret retrieval
@@ -259,6 +260,40 @@ update_sssd_password_only() {
     fi
 }
 
+# Set up cron job for password rotation checks
+setup_password_rotation_cron() {
+    echo "Setting up cron job for password rotation checks"
+    
+    # Define the cron job
+    SCRIPT_PATH="$script_dir/00_sssd_setup.sh"
+    LOG_FILE="/var/log/ldap-password-rotation.log"
+    CRON_JOB="*/5 * * * * $SCRIPT_PATH --password-update-only >> $LOG_FILE 2>&1"
+    
+    # Check if cron job already exists
+    if crontab -l 2>/dev/null | grep -q "$SCRIPT_PATH --password-update-only"; then
+        echo "Cron job for password rotation already exists"
+        return 0
+    fi
+    
+    # Create log file if it doesn't exist
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE"
+    
+    # Add cron job
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    
+    echo "Cron job added successfully:"
+    echo "  Schedule: Every 5 minutes"
+    echo "  Command: $SCRIPT_PATH --password-update-only"
+    echo "  Log file: $LOG_FILE"
+    
+    # Ensure cron service is running
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable cron 2>/dev/null || systemctl enable crond 2>/dev/null || true
+        systemctl start cron 2>/dev/null || systemctl start crond 2>/dev/null || true
+    fi
+}
+
 # Configure PAM and home directory creation
 configure_pam_and_homedir() {
     echo "Configuring PAM and home directory creation"
@@ -331,6 +366,16 @@ main() {
         configure_pam_and_homedir
         configure_sudo_access
         start_sssd_service
+        
+        # Set up cron job if enabled in configuration and using Key Vault
+        if [ "${SETUP_CRON,,}" = "true" ] && [ "${USE_KEYVAULT,,}" = "true" ]; then
+            echo ""
+            echo "Setting up password rotation cron job..."
+            setup_password_rotation_cron
+        elif [ "${SETUP_CRON,,}" = "true" ] && [ "${USE_KEYVAULT,,}" != "true" ]; then
+            echo ""
+            echo "Warning: Cron setup is enabled but Key Vault is not configured. Skipping cron setup."
+        fi
         
         echo "LDAP authentication setup completed successfully"
     fi

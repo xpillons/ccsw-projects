@@ -59,7 +59,8 @@ Edit `ldap-config.json` with your LDAP server details:
   "idMapping": "True",
   "hpcAdminGroup": "HPC Admins",
   "enumerate": "False",
-  "homeDir": "/shared/home"
+  "homeDir": "/shared/home",
+  "setupCron": "False"
 }
 ```
 
@@ -135,6 +136,7 @@ Drain existing nodes and start new ones to apply the LDAP authentication configu
 | `hpcAdminGroup` | LDAP group granted sudo access | `"HPC Admins"` | Yes |
 | `enumerate` | Allow domain enumeration | `"True"` or `"False"` | Yes |
 | `homeDir` | Base directory for user home directories | `"/shared/home"` | Yes |
+| `setupCron` | Automatically set up cron job for password rotation | `"True"` or `"False"` | Yes |
 
 ## 🔄 Password Rotation
 
@@ -158,7 +160,13 @@ Only checks for password changes in Key Vault and updates SSSD configuration if 
 
 ### Automation Example
 
-Create a cron job for regular password rotation checks:
+The script can automatically set up cron jobs for password rotation when the `setupCron` parameter is set to `"True"` in the configuration file. This eliminates the need for manual cron job creation.
+
+**Automatic Cron Setup** (Recommended):
+Set `"setupCron": "True"` in your `ldap-config.json` configuration file. The script will automatically create a cron job that runs every 5 minutes to check for password updates.
+
+**Manual Cron Setup** (Alternative):
+If you prefer manual control, set `"setupCron": "False"` and create your own cron job:
 
 ```bash
 # Check for password updates every hour

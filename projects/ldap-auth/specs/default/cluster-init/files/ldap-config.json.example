@@ -13,5 +13,6 @@
   "idMapping": "True",
   "hpcAdminGroup": "HPC Admins",
   "enumerate": "False",
-  "homeDir": "/shared/home"
+  "homeDir": "/shared/home",
+  "setupCron": "False"
 }
