@@ -4,6 +4,11 @@ set -e
 # Global variables
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Logging function to prefix messages with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
 # Parse command line arguments
 PASSWORD_UPDATE_ONLY=false
 while [[ $# -gt 0 ]]; do
@@ -30,7 +35,7 @@ initialize_environment() {
     
     CONFIG_FILE="$CYCLECLOUD_SPEC_PATH/files/ldap-config.json"
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "Error: Configuration file $CONFIG_FILE not found"
+        log "Error: Configuration file $CONFIG_FILE not found"
         exit 1
     fi
     
@@ -79,7 +84,7 @@ detect_platform() {
                     platform_version="$VERSION_ID"
                     ;;
                 *)
-                    echo "Warning: Unknown platform ID: $ID, attempting to detect family"
+                    log "Warning: Unknown platform ID: $ID, attempting to detect family"
                     if [ -f /etc/debian_version ]; then
                         platform_family="debian"
                         platform="debian"
@@ -87,19 +92,19 @@ detect_platform() {
                         platform_family="rhel"
                         platform="redhat"
                     else
-                        echo "Error: Unable to detect platform"
+                        log "Error: Unable to detect platform"
                         exit 1
                     fi
                     ;;
             esac
         else
-            echo "Error: Cannot detect platform - /etc/os-release not found"
+            log "Error: Cannot detect platform - /etc/os-release not found"
             exit 1
         fi
     fi
     
     export platform_family platform platform_version
-    echo "Detected platform: $platform (family: $platform_family, version: $platform_version)"
+    log "Detected platform: $platform (family: $platform_family, version: $platform_version)"
 }
 
 # Install required packages based on platform
@@ -111,14 +116,14 @@ install_dependencies() {
     
     # Check if jq is installed, install it if not
     if ! command -v jq &> /dev/null; then
-        echo "jq not found, installing..."
+        log "jq not found, installing..."
         
         if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
             DEBIAN_FRONTEND=noninteractive apt update && apt install -y jq
         elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "centos" ] || [ "$platform_family" == "rhel" ]; then 
             yum install -y jq
         else
-            echo "Error: Unsupported platform for dependency installation: $platform"
+            log "Error: Unsupported platform for dependency installation: $platform"
             exit 1
         fi
     fi
@@ -126,7 +131,7 @@ install_dependencies() {
 
 # Load configuration from JSON file
 load_configuration() {
-    echo "Loading configuration from $CONFIG_FILE"
+    log "Loading configuration from $CONFIG_FILE"
     
     # Parse JSON configuration
     USE_KEYVAULT=$(jq -r '.useKeyvault' "$CONFIG_FILE")
@@ -158,7 +163,7 @@ handle_keyvault_auth() {
     SSSD_CONFIG_NEEDS_UPDATE=false
     
     if [ "${USE_KEYVAULT,,}" == "true" ]; then
-        echo "Using Azure Key Vault for password retrieval"
+        log "Using Azure Key Vault for password retrieval"
         
         # Define marker file path
         MARKER_FILE="/var/lib/ldap-auth/${KEYVAULT_SECRET_NAME}_last_updated.txt"
@@ -166,22 +171,22 @@ handle_keyvault_auth() {
         
         # Install Azure CLI using the script install-azcli.sh if not already installed
         if ! command -v az &> /dev/null; then
-            echo "Azure CLI not found, installing..."
+            log "Azure CLI not found, installing..."
             chmod +x "$CYCLECLOUD_SPEC_PATH/files/install-azcli.sh"
             bash "$CYCLECLOUD_SPEC_PATH/files/install-azcli.sh"
         fi
         
         # Logon using the VM identity
-        echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
-        az login --identity --client-id "$CLIENT_ID" >/dev/null 2>&1 || (echo "Error: az login failed"; exit 1)
+        log "Logging in to Azure using managed identity with client ID $CLIENT_ID"
+        az login --identity --client-id "$CLIENT_ID" >/dev/null 2>&1 || (log "Error: az login failed"; exit 1)
         
-        echo "Retrieving LDAP bind password from Keyvault"
+        log "Retrieving LDAP bind password from Keyvault"
         SECRET_JSON=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" -o json)
         BIND_DN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.value')
         SECRET_UPDATED=$(echo "$SECRET_JSON" | jq -r '.attributes.updated')
         
         if [ -z "$BIND_DN_PASSWORD" ] || [ "$BIND_DN_PASSWORD" == "null" ]; then
-            echo "Error: Unable to retrieve LDAP bind password from Keyvault"
+            log "Error: Unable to retrieve LDAP bind password from Keyvault"
             exit 1
         fi
 
@@ -189,14 +194,14 @@ handle_keyvault_auth() {
         if [ -f "$MARKER_FILE" ]; then
             LAST_SECRET_UPDATED=$(cat "$MARKER_FILE" 2>/dev/null || echo "0")
             if [ "$SECRET_UPDATED" != "$LAST_SECRET_UPDATED" ]; then
-                echo "Secret has been updated since last run (was: $LAST_SECRET_UPDATED, now: $SECRET_UPDATED)"
+                log "Secret has been updated since last run (was: $LAST_SECRET_UPDATED, now: $SECRET_UPDATED)"
                 SSSD_CONFIG_NEEDS_UPDATE=true
             else
-                echo "Secret unchanged since last run (updated: $SECRET_UPDATED)"
+                log "Secret unchanged since last run (updated: $SECRET_UPDATED)"
                 SSSD_CONFIG_NEEDS_UPDATE=false
             fi
         else
-            echo "First time retrieving secret from KeyVault"
+            log "First time retrieving secret from KeyVault"
             SSSD_CONFIG_NEEDS_UPDATE=true
         fi
         
@@ -204,10 +209,10 @@ handle_keyvault_auth() {
         echo "$SECRET_UPDATED" > "$MARKER_FILE"
         chmod 600 "$MARKER_FILE"
         
-        echo "Secret last updated: $(date -d @$SECRET_UPDATED 2>/dev/null || date -r $SECRET_UPDATED 2>/dev/null || echo $SECRET_UPDATED)"
+        log "Secret last updated: $(date -d @$SECRET_UPDATED 2>/dev/null || date -r $SECRET_UPDATED 2>/dev/null || echo $SECRET_UPDATED)"
         export BIND_DN_PASSWORD
     else
-        echo "Do not use KeyVault, using password from parameter file"
+        log "Do not use KeyVault, using password from parameter file"
         # When not using KeyVault, check if sssd.conf exists to determine if update is needed
         if [ ! -f "/etc/sssd/sssd.conf" ]; then
             SSSD_CONFIG_NEEDS_UPDATE=true
@@ -219,7 +224,7 @@ handle_keyvault_auth() {
 
 # Configure SSH settings
 configure_ssh() {
-    echo "Configuring SSH settings"
+    log "Configuring SSH settings"
     
     # Disable SSH password authentication
     sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
@@ -239,7 +244,7 @@ install_sssd_packages() {
         detect_platform
     fi
     
-    echo "Installing SSSD packages for platform: $platform"
+    log "Installing SSSD packages for platform: $platform"
     
     #supported platforms RHEL 8/9, AlmaLinux 8/9, Ubuntu 20/22
     # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
@@ -253,7 +258,7 @@ install_sssd_packages() {
         yum install -y sssd sssd-tools sssd-ldap openldap-clients oddjob-mkhomedir
         TLS_CERT_Location="/etc/pki/tls/certs/ca-bundle.crt"
     else
-        echo "Unsupported platform: $platform"
+        log "Unsupported platform: $platform"
         exit 1
     fi
     
@@ -263,7 +268,7 @@ install_sssd_packages() {
 # Configure SSSD configuration file
 configure_sssd() {
     if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
-        echo "Configuring SSSD (configuration update needed)"
+        log "Configuring SSSD (configuration update needed)"
         
         # Copy template file
         cp -f "$CYCLECLOUD_SPEC_PATH"/files/sssd.conf /etc/sssd/sssd.conf
@@ -287,48 +292,48 @@ configure_sssd() {
         chmod 600 /etc/sssd/sssd.conf
         chown root:root /etc/sssd/sssd.conf
         
-        echo "SSSD configuration updated successfully"
+        log "SSSD configuration updated successfully"
     else
-        echo "SSSD configuration update skipped - no changes needed"
+        log "SSSD configuration update skipped - no changes needed"
     fi
 }
 
 # Password-only update function for Key Vault password changes
 update_sssd_password_only() {
-    echo "Password-only update mode: Checking for Key Vault password changes"
+    log "Password-only update mode: Checking for Key Vault password changes"
     
     if [ "${USE_KEYVAULT,,}" != "true" ]; then
-        echo "Error: Password-only update mode requires Key Vault to be enabled"
+        log "Error: Password-only update mode requires Key Vault to be enabled"
         exit 1
     fi
     
     if [ ! -f "/etc/sssd/sssd.conf" ]; then
-        echo "Error: SSSD configuration file not found. Run full setup first."
+        log "Error: SSSD configuration file not found. Run full setup first."
         exit 1
     fi
     
     if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
-        echo "Password update detected, updating SSSD configuration"
+        log "Password update detected, updating SSSD configuration"
         
         # Read the current SSSD config to preserve other settings
         # Only update the obfuscated password in the existing config
         echo -n "$BIND_DN_PASSWORD" | sss_obfuscate --domain default -s
         
-        echo "SSSD password updated successfully"
+        log "SSSD password updated successfully"
         
         # Restart SSSD service
-        echo "Restarting SSSD service due to password change"
+        log "Restarting SSSD service due to password change"
         systemctl restart sssd.service
         
-        echo "Password update completed successfully"
+        log "Password update completed successfully"
     else
-        echo "No password update needed - secret unchanged"
+        log "No password update needed - secret unchanged"
     fi
 }
 
 # Set up cron job for password rotation checks
 setup_password_rotation_cron() {
-    echo "Setting up cron job for password rotation checks"
+    log "Setting up cron job for password rotation checks"
     
     # Get the absolute path to the script
     SCRIPT_PATH="$(readlink -f "$script_dir/00_sssd_setup.sh")"
@@ -336,14 +341,14 @@ setup_password_rotation_cron() {
     # Set a proper PATH for cron execution to ensure system commands are found
     CRON_JOB="*/5 * * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin $SCRIPT_PATH --password-update-only >> $LOG_FILE 2>&1"
     
-    echo "Script path: $SCRIPT_PATH"
+    log "Script path: $SCRIPT_PATH"
     
     # Ensure the marker directory exists
     mkdir -p /var/lib/ldap-auth
     
     # Check if cron job already exists
     if crontab -l 2>/dev/null | grep -q "$SCRIPT_PATH --password-update-only"; then
-        echo "Cron job for password rotation already exists"
+        log "Cron job for password rotation already exists"
         return 0
     fi
     
@@ -361,20 +366,20 @@ setup_password_rotation_cron() {
     fi
     
     # Verify the cron job was added
-    echo "Verifying cron job installation..."
+    log "Verifying cron job installation..."
     if crontab -l 2>/dev/null | grep -q "$SCRIPT_PATH --password-update-only"; then
-        echo "✓ Cron job added successfully:"
-        echo "  Schedule: Every 5 minutes"
-        echo "  Command: $SCRIPT_PATH --password-update-only"
-        echo "  Log file: $LOG_FILE"
-        echo "  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        log "✓ Cron job added successfully:"
+        log "  Schedule: Every 5 minutes"
+        log "  Command: $SCRIPT_PATH --password-update-only"
+        log "  Log file: $LOG_FILE"
+        log "  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         
         # Show current crontab for verification
-        echo ""
-        echo "Current crontab entries:"
-        crontab -l 2>/dev/null | grep -v "^#" | grep -v "^$" || echo "  (no entries found)"
+        log ""
+        log "Current crontab entries:"
+        crontab -l 2>/dev/null | grep -v "^#" | grep -v "^$" || log "  (no entries found)"
     else
-        echo "✗ Failed to add cron job. Please check manually with 'crontab -l'"
+        log "✗ Failed to add cron job. Please check manually with 'crontab -l'"
         return 1
     fi
     
@@ -382,13 +387,13 @@ setup_password_rotation_cron() {
     if command -v systemctl >/dev/null 2>&1; then
         systemctl enable cron 2>/dev/null || systemctl enable crond 2>/dev/null || true
         systemctl start cron 2>/dev/null || systemctl start crond 2>/dev/null || true
-        echo "✓ Cron service is running"
+        log "✓ Cron service is running"
     fi
 }
 
 # Configure PAM and home directory creation
 configure_pam_and_homedir() {
-    echo "Configuring PAM and home directory creation"
+    log "Configuring PAM and home directory creation"
     
     if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
         mkdir -p "$HOME_DIR"
@@ -410,33 +415,33 @@ configure_pam_and_homedir() {
 
 # Configure sudo access for LDAP admin group
 configure_sudo_access() {
-    echo "Configuring sudo access for LDAP admin group: $HPC_ADMIN_GROUP"
+    log "Configuring sudo access for LDAP admin group: $HPC_ADMIN_GROUP"
     echo "\"%$HPC_ADMIN_GROUP\" ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hpc_admins
 }
 
 # Start and enable SSSD service
 start_sssd_service() {
-    echo "Managing SSSD service"
+    log "Managing SSSD service"
     
     # Always ensure the service is started
     if ! systemctl is-active --quiet sssd.service; then
-        echo "Starting SSSD service"
+        log "Starting SSSD service"
         systemctl start sssd.service
     fi
     
     # Only restart if configuration was updated
     if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
-        echo "Restarting SSSD service due to configuration changes"
+        log "Restarting SSSD service due to configuration changes"
         systemctl restart sssd.service
     else
-        echo "SSSD service restart skipped - no configuration changes detected"
+        log "SSSD service restart skipped - no configuration changes detected"
     fi
 }
 
 # Main function to orchestrate the setup
 main() {
     if [ "$PASSWORD_UPDATE_ONLY" = "true" ]; then
-        echo "Starting LDAP password-only update"
+        log "Starting LDAP password-only update"
         
         initialize_environment
         install_dependencies
@@ -444,9 +449,9 @@ main() {
         handle_keyvault_auth
         update_sssd_password_only
         
-        echo "LDAP password update completed successfully"
+        log "LDAP password update completed successfully"
     else
-        echo "Starting LDAP authentication setup"
+        log "Starting LDAP authentication setup"
         
         initialize_environment
         install_dependencies
@@ -461,15 +466,15 @@ main() {
         
         # Set up cron job if enabled in configuration and using Key Vault
         if [ "${SETUP_CRON,,}" = "true" ] && [ "${USE_KEYVAULT,,}" = "true" ]; then
-            echo ""
-            echo "Setting up password rotation cron job..."
+            log ""
+            log "Setting up password rotation cron job..."
             setup_password_rotation_cron
         elif [ "${SETUP_CRON,,}" = "true" ] && [ "${USE_KEYVAULT,,}" != "true" ]; then
-            echo ""
-            echo "Warning: Cron setup is enabled but Key Vault is not configured. Skipping cron setup."
+            log ""
+            log "Warning: Cron setup is enabled but Key Vault is not configured. Skipping cron setup."
         fi
         
-        echo "LDAP authentication setup completed successfully"
+        log "LDAP authentication setup completed successfully"
     fi
 }
 
