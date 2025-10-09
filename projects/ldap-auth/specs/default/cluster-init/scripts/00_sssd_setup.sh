@@ -41,15 +41,73 @@ initialize_environment() {
 
 # Detect platform information
 detect_platform() {
-    platform_family=$(jetpack config platform_family)
-    platform=$(jetpack config platform)
-    platform_version=$(jetpack config platform_version)
+    # Try to use jetpack if available, otherwise fall back to OS detection
+    if command -v jetpack >/dev/null 2>&1; then
+        platform_family=$(jetpack config platform_family 2>/dev/null)
+        platform=$(jetpack config platform 2>/dev/null)
+        platform_version=$(jetpack config platform_version 2>/dev/null)
+    fi
+    
+    # Fallback platform detection if jetpack is not available (e.g., when running in cron)
+    if [ -z "$platform_family" ] || [ -z "$platform" ]; then
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            case "$ID" in
+                ubuntu)
+                    platform="ubuntu"
+                    platform_family="debian"
+                    platform_version="$VERSION_ID"
+                    ;;
+                debian)
+                    platform="debian" 
+                    platform_family="debian"
+                    platform_version="$VERSION_ID"
+                    ;;
+                rhel|redhat)
+                    platform="redhat"
+                    platform_family="rhel"
+                    platform_version="$VERSION_ID"
+                    ;;
+                almalinux)
+                    platform="almalinux"
+                    platform_family="rhel"
+                    platform_version="$VERSION_ID"
+                    ;;
+                centos)
+                    platform="centos"
+                    platform_family="rhel"
+                    platform_version="$VERSION_ID"
+                    ;;
+                *)
+                    echo "Warning: Unknown platform ID: $ID, attempting to detect family"
+                    if [ -f /etc/debian_version ]; then
+                        platform_family="debian"
+                        platform="debian"
+                    elif [ -f /etc/redhat-release ]; then
+                        platform_family="rhel"
+                        platform="redhat"
+                    else
+                        echo "Error: Unable to detect platform"
+                        exit 1
+                    fi
+                    ;;
+            esac
+        else
+            echo "Error: Cannot detect platform - /etc/os-release not found"
+            exit 1
+        fi
+    fi
+    
     export platform_family platform platform_version
+    echo "Detected platform: $platform (family: $platform_family, version: $platform_version)"
 }
 
 # Install required packages based on platform
 install_dependencies() {
-    detect_platform
+    # Only detect platform if not already detected
+    if [ -z "$platform_family" ] || [ -z "$platform" ]; then
+        detect_platform
+    fi
     
     # Check if jq is installed, install it if not
     if ! command -v jq &> /dev/null; then
@@ -57,8 +115,11 @@ install_dependencies() {
         
         if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
             DEBIAN_FRONTEND=noninteractive apt update && apt install -y jq
-        elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 
+        elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "centos" ] || [ "$platform_family" == "rhel" ]; then 
             yum install -y jq
+        else
+            echo "Error: Unsupported platform for dependency installation: $platform"
+            exit 1
         fi
     fi
 }
@@ -173,6 +234,11 @@ EOF
 
 # Install SSSD packages based on platform
 install_sssd_packages() {
+    # Only detect platform if not already detected
+    if [ -z "$platform_family" ] || [ -z "$platform" ]; then
+        detect_platform
+    fi
+    
     echo "Installing SSSD packages for platform: $platform"
     
     #supported platforms RHEL 8/9, AlmaLinux 8/9, Ubuntu 20/22
@@ -180,7 +246,7 @@ install_sssd_packages() {
     if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
         DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils
         TLS_CERT_Location="/etc/ssl/certs/ca-certificates.crt"
-    elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 
+    elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "centos" ] || [ "$platform_family" == "rhel" ]; then 
         if [ "$platform" == "almalinux" ]; then
             yum install epel-release -y
         fi
@@ -267,7 +333,8 @@ setup_password_rotation_cron() {
     # Get the absolute path to the script
     SCRIPT_PATH="$(readlink -f "$script_dir/00_sssd_setup.sh")"
     LOG_FILE="/var/log/ldap-password-rotation.log"
-    CRON_JOB="*/5 * * * * $SCRIPT_PATH --password-update-only >> $LOG_FILE 2>&1"
+    # Set a proper PATH for cron execution to ensure system commands are found
+    CRON_JOB="*/5 * * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin $SCRIPT_PATH --password-update-only >> $LOG_FILE 2>&1"
     
     echo "Script path: $SCRIPT_PATH"
     
@@ -300,6 +367,7 @@ setup_password_rotation_cron() {
         echo "  Schedule: Every 5 minutes"
         echo "  Command: $SCRIPT_PATH --password-update-only"
         echo "  Log file: $LOG_FILE"
+        echo "  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         
         # Show current crontab for verification
         echo ""
