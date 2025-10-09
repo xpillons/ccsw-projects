@@ -264,10 +264,15 @@ update_sssd_password_only() {
 setup_password_rotation_cron() {
     echo "Setting up cron job for password rotation checks"
     
-    # Define the cron job
-    SCRIPT_PATH="$script_dir/00_sssd_setup.sh"
+    # Get the absolute path to the script
+    SCRIPT_PATH="$(readlink -f "$script_dir/00_sssd_setup.sh")"
     LOG_FILE="/var/log/ldap-password-rotation.log"
     CRON_JOB="*/5 * * * * $SCRIPT_PATH --password-update-only >> $LOG_FILE 2>&1"
+    
+    echo "Script path: $SCRIPT_PATH"
+    
+    # Ensure the marker directory exists
+    mkdir -p /var/lib/ldap-auth
     
     # Check if cron job already exists
     if crontab -l 2>/dev/null | grep -q "$SCRIPT_PATH --password-update-only"; then
@@ -279,18 +284,37 @@ setup_password_rotation_cron() {
     touch "$LOG_FILE"
     chmod 644 "$LOG_FILE"
     
-    # Add cron job
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    # Get current crontab and add new job
+    current_crontab=$(crontab -l 2>/dev/null || echo "")
+    if [ -n "$current_crontab" ]; then
+        echo "$current_crontab" | crontab -
+        echo "$CRON_JOB" | crontab -
+    else
+        echo "$CRON_JOB" | crontab -
+    fi
     
-    echo "Cron job added successfully:"
-    echo "  Schedule: Every 5 minutes"
-    echo "  Command: $SCRIPT_PATH --password-update-only"
-    echo "  Log file: $LOG_FILE"
+    # Verify the cron job was added
+    echo "Verifying cron job installation..."
+    if crontab -l 2>/dev/null | grep -q "$SCRIPT_PATH --password-update-only"; then
+        echo "✓ Cron job added successfully:"
+        echo "  Schedule: Every 5 minutes"
+        echo "  Command: $SCRIPT_PATH --password-update-only"
+        echo "  Log file: $LOG_FILE"
+        
+        # Show current crontab for verification
+        echo ""
+        echo "Current crontab entries:"
+        crontab -l 2>/dev/null | grep -v "^#" | grep -v "^$" || echo "  (no entries found)"
+    else
+        echo "✗ Failed to add cron job. Please check manually with 'crontab -l'"
+        return 1
+    fi
     
     # Ensure cron service is running
     if command -v systemctl >/dev/null 2>&1; then
         systemctl enable cron 2>/dev/null || systemctl enable crond 2>/dev/null || true
         systemctl start cron 2>/dev/null || systemctl start crond 2>/dev/null || true
+        echo "✓ Cron service is running"
     fi
 }
 
