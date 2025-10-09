@@ -4,7 +4,7 @@ This project provides comprehensive LDAP authentication setup for Azure CycleClo
 
 ## 🚀 Features
 
-- **Multi-Platform Support**: RHEL, CentOS, AlmaLinux, Ubuntu, and SLES
+- **Multi-Platform Support**: RHEL, CentOS, AlmaLinux, and Ubuntu
 - **Secure Password Management**: Azure Key Vault integration for secure password storage
 - **Idempotent Operations**: Safe to run multiple times without side effects
 - **Password Rotation**: Automated password update detection and application
