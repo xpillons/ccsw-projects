@@ -4,6 +4,23 @@ set -e
 # Global variables
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Parse command line arguments
+PASSWORD_UPDATE_ONLY=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --password-update-only)
+            PASSWORD_UPDATE_ONLY=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--password-update-only]"
+            echo "  --password-update-only: Only check for password updates and update SSSD config if needed"
+            exit 1
+            ;;
+    esac
+done
+
 # Initialize environment and paths
 initialize_environment() {
     # if CYCLECLOUD_SPEC_PATH is not set use the script directory as the base path
@@ -78,8 +95,14 @@ load_configuration() {
 
 # Handle Azure Key Vault authentication and secret retrieval
 handle_keyvault_auth() {
+    SSSD_CONFIG_NEEDS_UPDATE=false
+    
     if [ "${USE_KEYVAULT,,}" == "true" ]; then
         echo "Using Azure Key Vault for password retrieval"
+        
+        # Define marker file path
+        MARKER_FILE="/var/lib/ldap-auth/${KEYVAULT_SECRET_NAME}_last_updated.txt"
+        mkdir -p "$(dirname "$MARKER_FILE")"
         
         # Install Azure CLI using the script install-azcli.sh if not already installed
         if ! command -v az &> /dev/null; then
@@ -102,13 +125,36 @@ handle_keyvault_auth() {
             exit 1
         fi
 
-        echo "Secret last updated: $SECRET_UPDATED"
-        # keep the last updated value in a marker file
-        echo "$SECRET_UPDATED" > "$CYCLECLOUD_SPEC_PATH/files/${KEYVAULT_SECRET_NAME}_last_updated.txt"
+        # Check if secret has been updated since last run
+        if [ -f "$MARKER_FILE" ]; then
+            LAST_SECRET_UPDATED=$(cat "$MARKER_FILE" 2>/dev/null || echo "0")
+            if [ "$SECRET_UPDATED" != "$LAST_SECRET_UPDATED" ]; then
+                echo "Secret has been updated since last run (was: $LAST_SECRET_UPDATED, now: $SECRET_UPDATED)"
+                SSSD_CONFIG_NEEDS_UPDATE=true
+            else
+                echo "Secret unchanged since last run (updated: $SECRET_UPDATED)"
+                SSSD_CONFIG_NEEDS_UPDATE=false
+            fi
+        else
+            echo "First time retrieving secret from KeyVault"
+            SSSD_CONFIG_NEEDS_UPDATE=true
+        fi
+        
+        # Save current secret updated timestamp to marker file
+        echo "$SECRET_UPDATED" > "$MARKER_FILE"
+        chmod 600 "$MARKER_FILE"
+        
+        echo "Secret last updated: $(date -d @$SECRET_UPDATED 2>/dev/null || date -r $SECRET_UPDATED 2>/dev/null || echo $SECRET_UPDATED)"
         export BIND_DN_PASSWORD
     else
         echo "Do not use KeyVault, using password from parameter file"
+        # When not using KeyVault, check if sssd.conf exists to determine if update is needed
+        if [ ! -f "/etc/sssd/sssd.conf" ]; then
+            SSSD_CONFIG_NEEDS_UPDATE=true
+        fi
     fi
+    
+    export SSSD_CONFIG_NEEDS_UPDATE
 }
 
 # Configure SSH settings
@@ -164,29 +210,68 @@ install_sssd_packages() {
 
 # Configure SSSD configuration file
 configure_sssd() {
-    echo "Configuring SSSD"
-    
-    # Copy template file
-    cp -f "$CYCLECLOUD_SPEC_PATH"/files/sssd.conf /etc/sssd/sssd.conf
-    
-    # Replace values in template file from environment variables
-    sed -i "s#LDAP_URI#$LDAP_URI#g" /etc/sssd/sssd.conf
-    sed -i "s#CACHE_Credentials#$CACHE_Credentials#g" /etc/sssd/sssd.conf
-    sed -i "s#LDAP_Schema#$LDAP_Schema#g" /etc/sssd/sssd.conf
-    sed -i "s#LDAP_search_base#$LDAP_search_base#g" /etc/sssd/sssd.conf
-    sed -i "s#LDAP_default_bind_dn#$LDAP_default_bind_dn#g" /etc/sssd/sssd.conf
-    sed -i "s#TLS_reqcert#$TLS_reqcert#g" /etc/sssd/sssd.conf
-    sed -i "s#ID_mapping#$ID_mapping#g" /etc/sssd/sssd.conf
-    sed -i "s#ENUMERATE#$ENUMERATE#g" /etc/sssd/sssd.conf
-    sed -i "s#TLS_CERT_Location#$TLS_CERT_Location#g" /etc/sssd/sssd.conf
-    sed -i "s#HOME_DIR#$HOME_DIR#g" /etc/sssd/sssd.conf
+    if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
+        echo "Configuring SSSD (configuration update needed)"
+        
+        # Copy template file
+        cp -f "$CYCLECLOUD_SPEC_PATH"/files/sssd.conf /etc/sssd/sssd.conf
+        
+        # Replace values in template file from environment variables
+        sed -i "s#LDAP_URI#$LDAP_URI#g" /etc/sssd/sssd.conf
+        sed -i "s#CACHE_Credentials#$CACHE_Credentials#g" /etc/sssd/sssd.conf
+        sed -i "s#LDAP_Schema#$LDAP_Schema#g" /etc/sssd/sssd.conf
+        sed -i "s#LDAP_search_base#$LDAP_search_base#g" /etc/sssd/sssd.conf
+        sed -i "s#LDAP_default_bind_dn#$LDAP_default_bind_dn#g" /etc/sssd/sssd.conf
+        sed -i "s#TLS_reqcert#$TLS_reqcert#g" /etc/sssd/sssd.conf
+        sed -i "s#ID_mapping#$ID_mapping#g" /etc/sssd/sssd.conf
+        sed -i "s#ENUMERATE#$ENUMERATE#g" /etc/sssd/sssd.conf
+        sed -i "s#TLS_CERT_Location#$TLS_CERT_Location#g" /etc/sssd/sssd.conf
+        sed -i "s#HOME_DIR#$HOME_DIR#g" /etc/sssd/sssd.conf
 
-    # Obfuscate the bind DN password
-    echo -n "$BIND_DN_PASSWORD" | sss_obfuscate --domain default -s
+        # Obfuscate the bind DN password
+        echo -n "$BIND_DN_PASSWORD" | sss_obfuscate --domain default -s
 
-    # Set proper permissions
-    chmod 600 /etc/sssd/sssd.conf
-    chown root:root /etc/sssd/sssd.conf
+        # Set proper permissions
+        chmod 600 /etc/sssd/sssd.conf
+        chown root:root /etc/sssd/sssd.conf
+        
+        echo "SSSD configuration updated successfully"
+    else
+        echo "SSSD configuration update skipped - no changes needed"
+    fi
+}
+
+# Password-only update function for Key Vault password changes
+update_sssd_password_only() {
+    echo "Password-only update mode: Checking for Key Vault password changes"
+    
+    if [ "${USE_KEYVAULT,,}" != "true" ]; then
+        echo "Error: Password-only update mode requires Key Vault to be enabled"
+        exit 1
+    fi
+    
+    if [ ! -f "/etc/sssd/sssd.conf" ]; then
+        echo "Error: SSSD configuration file not found. Run full setup first."
+        exit 1
+    fi
+    
+    if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
+        echo "Password update detected, updating SSSD configuration"
+        
+        # Read the current SSSD config to preserve other settings
+        # Only update the obfuscated password in the existing config
+        echo -n "$BIND_DN_PASSWORD" | sss_obfuscate --domain default -s
+        
+        echo "SSSD password updated successfully"
+        
+        # Restart SSSD service
+        echo "Restarting SSSD service due to password change"
+        systemctl restart sssd.service
+        
+        echo "Password update completed successfully"
+    else
+        echo "No password update needed - secret unchanged"
+    fi
 }
 
 # Configure PAM and home directory creation
@@ -227,27 +312,51 @@ configure_sudo_access() {
 
 # Start and enable SSSD service
 start_sssd_service() {
-    echo "Starting SSSD service"
-    systemctl start sssd.service
-    systemctl restart sssd.service
+    echo "Managing SSSD service"
+    
+    # Always ensure the service is started
+    if ! systemctl is-active --quiet sssd.service; then
+        echo "Starting SSSD service"
+        systemctl start sssd.service
+    fi
+    
+    # Only restart if configuration was updated
+    if [ "$SSSD_CONFIG_NEEDS_UPDATE" = "true" ]; then
+        echo "Restarting SSSD service due to configuration changes"
+        systemctl restart sssd.service
+    else
+        echo "SSSD service restart skipped - no configuration changes detected"
+    fi
 }
 
 # Main function to orchestrate the setup
 main() {
-    echo "Starting LDAP authentication setup"
-    
-    initialize_environment
-    install_dependencies
-    load_configuration
-    handle_keyvault_auth
-    configure_ssh
-    install_sssd_packages
-    configure_sssd
-    configure_pam_and_homedir
-    configure_sudo_access
-    start_sssd_service
-    
-    echo "LDAP authentication setup completed successfully"
+    if [ "$PASSWORD_UPDATE_ONLY" = "true" ]; then
+        echo "Starting LDAP password-only update"
+        
+        initialize_environment
+        install_dependencies
+        load_configuration
+        handle_keyvault_auth
+        update_sssd_password_only
+        
+        echo "LDAP password update completed successfully"
+    else
+        echo "Starting LDAP authentication setup"
+        
+        initialize_environment
+        install_dependencies
+        load_configuration
+        handle_keyvault_auth
+        configure_ssh
+        install_sssd_packages
+        configure_sssd
+        configure_pam_and_homedir
+        configure_sudo_access
+        start_sssd_service
+        
+        echo "LDAP authentication setup completed successfully"
+    fi
 }
 
 # Run main function
