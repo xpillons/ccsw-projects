@@ -173,7 +173,7 @@ handle_keyvault_auth() {
         
         # Logon using the VM identity
         echo "Logging in to Azure using managed identity with client ID $CLIENT_ID"
-        az login --identity --client-id "$CLIENT_ID" || (echo "Error: az login failed"; exit 1)
+        az login --identity --client-id "$CLIENT_ID" >/dev/null 2>&1 || (echo "Error: az login failed"; exit 1)
         
         echo "Retrieving LDAP bind password from Keyvault"
         SECRET_JSON=$(az keyvault secret show --name "$KEYVAULT_SECRET_NAME" --vault-name "$KEYVAULT_NAME" -o json)
