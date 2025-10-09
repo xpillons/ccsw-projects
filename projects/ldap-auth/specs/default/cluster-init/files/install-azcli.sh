@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Installs Azure CLI (az) on Debian/Ubuntu, RHEL/CentOS/Fedora,
-# and openSUSE/SLES.
+# Installs Azure CLI (az) on Debian/Ubuntu and RHEL/CentOS/Fedora.
 # Based on Microsoft Learn guidance as of 2025-08-05.
 
 set -euo pipefail
@@ -94,25 +93,6 @@ install_dnf_yum() {
   "$pkgmgr" -y install azure-cli
 }
 
-install_zypper() {
-  log "Installing Azure CLI via zypper (openSUSE/SLES)…"
-  # First try the SUSE-maintained package (often preinstalled on cloud images)
-  if ! zypper --non-interactive refresh; then
-    warn "zypper refresh failed; continuing…"
-  fi
-  if ! zypper --non-interactive install -y azure-cli; then
-    warn "SUSE repo install failed. Trying Microsoft repo for Azure CLI…"
-    rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    zypper --non-interactive addrepo --name "Azure CLI" --check \
-      https://packages.microsoft.com/yumrepos/azure-cli azure-cli
-    zypper --gpg-auto-import-keys --non-interactive refresh
-    zypper --non-interactive install --from azure-cli -y azure-cli || {
-      warn "zypper install from Microsoft repo failed."
-      return 1
-    }
-  fi
-}
-
 main() {
   detect_os
 
@@ -121,8 +101,6 @@ main() {
     install_apt
   elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1 || echo "$OS_ID_LIKE" | grep -qiE 'rhel|fedora|centos'; then
     install_dnf_yum
-  elif command -v zypper >/dev/null 2>&1 || echo "$OS_ID_LIKE" | grep -qi 'suse'; then
-    install_zypper
   else
     err "Unsupported or unrecognized Linux distribution: ${OS_ID} ${OS_VER}"
     echo "You can always use the official container:"

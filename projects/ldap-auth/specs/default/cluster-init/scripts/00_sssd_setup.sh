@@ -59,8 +59,6 @@ install_dependencies() {
             DEBIAN_FRONTEND=noninteractive apt update && apt install -y jq
         elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 
             yum install -y jq
-        elif [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
-            zypper install -y jq
         fi
     fi
 }
@@ -176,7 +174,7 @@ EOF
 install_sssd_packages() {
     echo "Installing SSSD packages for platform: $platform"
     
-    #supported platforms RHEL 8/9, AlmaLinux 8/9, SLES 15, Ubuntu 20/22
+    #supported platforms RHEL 8/9, AlmaLinux 8/9, Ubuntu 20/22
     # If statements check explicitly for supported OS then checks for the general "platform_family" to try and support any derivative OS of Debian/Rhel
     if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
         DEBIAN_FRONTEND=noninteractive apt install -y sssd sssd-tools sssd-ldap ldap-utils
@@ -187,19 +185,6 @@ install_sssd_packages() {
         fi
         yum install -y sssd sssd-tools sssd-ldap openldap-clients oddjob-mkhomedir
         TLS_CERT_Location="/etc/pki/tls/certs/ca-bundle.crt"
-    elif [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
-        systemctl stop nscd
-        systemctl disable nscd
-
-        if zypper lr home_lemmy04_idm &> /dev/null; then
-            zypper rr home_lemmy04_idm
-        fi
-
-        zypper addrepo -f https://download.opensuse.org/repositories/home:lemmy04:idm/"$platform_version"/home:lemmy04:idm.repo
-        zypper --gpg-auto-import-keys refresh 
-
-        zypper install -y sssd sssd-tools sssd-ldap openldap2-client authselect oddjob-mkhomedir
-        TLS_CERT_Location="/var/lib/ca-certificates/ca-bundle.pem"
     else
         echo "Unsupported platform: $platform"
         exit 1
@@ -281,7 +266,7 @@ configure_pam_and_homedir() {
     if [ "$platform" == "ubuntu" ] || [ "$platform_family" == "debian" ]; then 
         mkdir -p "$HOME_DIR"
         DEBIAN_FRONTEND=noninteractive pam-auth-update --enable mkhomedir
-    elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform" == "suse" ] || [ "$platform_family" == "rhel" ]; then 
+    elif [ "$platform" == "almalinux" ] || [ "$platform" == "redhat" ] || [ "$platform_family" == "rhel" ]; then 
         mkdir -p "$HOME_DIR"
         setsebool -P use_nfs_home_dirs 1
         semanage fcontext -a -e /home "$HOME_DIR" || true
@@ -291,14 +276,6 @@ configure_pam_and_homedir() {
         # If context does not exist it gets created, if context does exit the script carrys on.
         restorecon -Rv "$HOME_DIR"
         restorecon -Rv "$HOME_DIR_TOP"
-        systemctl enable --now oddjobd.service
-        authselect select sssd with-mkhomedir --force
-    fi
-
-    if [ "$platform" == "suse" ] || [ "$platform" == "sles" ] || [ "$platform" == "sles_hpc" ] || [ "$platform_family" == "suse" ]; then 
-        mkdir -p "$HOME_DIR"
-        pam-config -a --sss
-        pam-config -a --mkhomedir
         systemctl enable --now oddjobd.service
         authselect select sssd with-mkhomedir --force
     fi
