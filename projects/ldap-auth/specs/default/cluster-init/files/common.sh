@@ -7,13 +7,13 @@ read_os()
 }
 
 function is_scheduler() {
-    jetpack config slurm.role | grep -q 'scheduler'
+    jetpack config roles | grep -q 'scheduler'
 }
 
 function is_login() {
-    jetpack config slurm.role | grep -q 'login'
+    jetpack config roles | grep -q 'login'
 }
 
 function is_compute() {
-    jetpack config slurm.role | grep -q 'execute'
+    jetpack config roles | grep -q 'execute'
 }

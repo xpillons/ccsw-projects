@@ -1,0 +1,18 @@
+{
+  "useKeyvault": "False",
+  "clientId": "your-client-id",
+  "keyvaultName": "mykeyvault",
+  "keyvaultSecretName": "ldap-bind-password",
+  "cacheCredentials": "True",
+  "ldapUri": "ldap://172.20.90.4",
+  "ldapSearchBase": "dc=hpc,dc=azure",
+  "ldapSchema": "AD",
+  "ldapDefaultBindDn": "CN=Linux Binder,CN=Users,DC=hpc,DC=azure",
+  "bindDnPassword": "Service account password",
+  "tlsReqcert": "allow",
+  "idMapping": "True",
+  "hpcAdminGroup": "HPC Admins",
+  "enumerate": "False",
+  "homeDir": "/shared/home",
+  "setupCron": "False"
+}
