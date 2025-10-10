@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Azure CLI (az) on Debian/Ubuntu and RHEL/CentOS/Fedora.
-# Based on Microsoft Learn guidance as of 2025-08-05.
+# Based on Microsoft Learn guidance as of 2024-06-01.
 
 set -euo pipefail
 
