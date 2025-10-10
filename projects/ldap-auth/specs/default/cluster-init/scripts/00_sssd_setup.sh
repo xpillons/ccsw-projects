@@ -358,12 +358,10 @@ setup_password_rotation_cron() {
     
     # Get current crontab and add new job
     current_crontab=$(crontab -l 2>/dev/null || echo "")
-    if [ -n "$current_crontab" ]; then
-        echo "$current_crontab" | crontab -
-        echo "$CRON_JOB" | crontab -
-    else
-        echo "$CRON_JOB" | crontab -
-    fi
+    {
+        echo "$current_crontab"
+        echo "$CRON_JOB"
+    } | crontab -
     
     # Verify the cron job was added
     log "Verifying cron job installation..."
