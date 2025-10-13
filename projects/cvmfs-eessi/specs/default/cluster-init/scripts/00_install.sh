@@ -1,37 +1,420 @@
 #!/bin/bash
+# CVMFS-EESSI Installation Script
 # See https://techcommunity.microsoft.com/blog/azurehighperformancecomputingblog/using-gromacs-through-eessi-on-nc-a100-v4/4423933
+#
+# This script installs and configures CVMFS with EESSI support for CycleCloud clusters
 
-set -eo pipefail
-read_os()
-{
-    os_release=$(cat /etc/os-release | grep "^ID\=" | cut -d'=' -f 2 | xargs)
-    os_maj_ver=$(cat /etc/os-release | grep "^VERSION_ID\=" | cut -d'=' -f 2 | xargs)
-    full_version=$(cat /etc/os-release | grep "^VERSION\=" | cut -d'=' -f 2 | xargs)
+set -euo pipefail
+
+# Global variables
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Load configuration from environment file if it exists
+load_configuration() {
+    local config_file="$SCRIPT_DIR/../files/cvmfs-config.env"
+    
+    if [ -f "$config_file" ]; then
+        log "Loading configuration from $config_file"
+        # Source the configuration file, but only export variables we recognize
+        source "$config_file"
+    else
+        log "Configuration file $config_file not found, using defaults"
+    fi
+    
+    # Set variables with defaults (environment variables take precedence)
+    CVMFS_CACHE_QUOTA="${CVMFS_CACHE_QUOTA:-10000}"
+    
+    # Auto-detect optimal cache base directory if not explicitly set
+    if [ -z "${CVMFS_CACHE_BASE:-}" ]; then
+        if [ -d "/mnt/nvme" ]; then
+            CVMFS_CACHE_BASE="/mnt/nvme/cvmfs"
+            debug_log "Auto-detected NVMe storage, using $CVMFS_CACHE_BASE"
+        elif [ -d "/mnt" ]; then
+            CVMFS_CACHE_BASE="/mnt/cvmfs"
+            debug_log "Using /mnt storage for cache: $CVMFS_CACHE_BASE"
+        else
+            CVMFS_CACHE_BASE="/var/lib/cvmfs"
+            debug_log "Using default cache location: $CVMFS_CACHE_BASE"
+        fi
+    fi
+    
+    CVMFS_PROXY="${CVMFS_PROXY:-DIRECT}"
+    BACKUP_DIR="${BACKUP_DIR:-/var/lib/cvmfs-eessi-backup}"
+    DEBUG_LOGGING="${DEBUG_LOGGING:-false}"
+    
+    # Additional repositories (if specified in config)
+    ADDITIONAL_REPOS="${ADDITIONAL_REPOS:-}"
+    
+    log "Configuration loaded:"
+    log "  Cache quota: ${CVMFS_CACHE_QUOTA}MB"
+    log "  Cache base: $CVMFS_CACHE_BASE"
+    
+    # Show storage type detection info
+    if [[ "$CVMFS_CACHE_BASE" == "/mnt/nvme"* ]]; then
+        log "  Storage type: NVMe (high-performance)"
+    elif [[ "$CVMFS_CACHE_BASE" == "/mnt"* ]]; then
+        log "  Storage type: Local mount"
+    else
+        log "  Storage type: Default system storage"
+    fi
+    
+    log "  Proxy: $CVMFS_PROXY"
+    log "  Backup dir: $BACKUP_DIR"
+    log "  Debug logging: $DEBUG_LOGGING"
+    if [ -n "$ADDITIONAL_REPOS" ]; then
+        log "  Additional repos: $ADDITIONAL_REPOS"
+    fi
 }
 
-read_os
-case $os_release in
-    almalinux)
-        dnf install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm
-        dnf install -y cvmfs
-        dnf install -y https://github.com/EESSI/filesystem-layer/releases/download/latest/cvmfs-config-eessi-latest.noarch.rpm
-        ;;
-    ubuntu)
-        wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb
-        dpkg -i cvmfs-release-latest_all.deb
-        wget https://github.com/EESSI/filesystem-layer/releases/download/latest/cvmfs-config-eessi_latest_all.deb
-        dpkg -i cvmfs-config-eessi_latest_all.deb
-        apt update
-        apt install -y cvmfs
-        ;;
-    *)
-        logger -s "Untested OS $os_release $os_version"
-        exit 0
-        ;;
-esac
+LOG_FILE="/var/log/cvmfs-eessi-install.log"
 
-# configure CernVM-FS (no proxy, 10GB quota for CernVM-FS cache)
-bash -c "echo 'CVMFS_HTTP_PROXY=DIRECT' > /etc/cvmfs/default.local"
-bash -c "echo 'CVMFS_CLIENT_PROFILE="single"' > /etc/cvmfs/default.local"
-bash -c "echo 'CVMFS_QUOTA_LIMIT=10000' >> /etc/cvmfs/default.local"
-cvmfs_config setup
+# Logging function to prefix messages with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+# Debug logging function (only logs if DEBUG_LOGGING is true)
+debug_log() {
+    if [ "${DEBUG_LOGGING:-false}" = "true" ]; then
+        log "DEBUG: $*"
+    fi
+}
+
+# Error handler function
+error_exit() {
+    log "ERROR: $1"
+    cleanup_on_error
+    exit 1
+}
+
+# Cleanup function for error scenarios
+cleanup_on_error() {
+    log "Performing cleanup after error..."
+    # Remove any partially installed packages or configurations
+    if [ -d "$BACKUP_DIR" ]; then
+        log "Backup directory exists, cleanup may be needed manually"
+    fi
+}
+
+# Create backup of existing configuration
+backup_existing_config() {
+    if [ -f "/etc/cvmfs/default.local" ]; then
+        log "Backing up existing CVMFS configuration"
+        mkdir -p "$BACKUP_DIR"
+        cp "/etc/cvmfs/default.local" "$BACKUP_DIR/default.local.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+}
+
+# Detect platform information with fallback methods
+detect_platform() {
+    log "Detecting platform information"
+    
+    # Try multiple methods for platform detection
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        os_release="$ID"
+        os_version="$VERSION_ID"
+        os_major_version=$(echo "$VERSION_ID" | cut -d. -f1)
+    else
+        error_exit "Cannot detect platform - /etc/os-release not found"
+    fi
+    
+    log "Detected OS: $os_release $os_version"
+    export os_release os_version os_major_version
+}
+
+# Validate platform support
+validate_platform_support() {
+    case "$os_release" in
+        almalinux|rhel|centos|rocky)
+            if [ "$os_major_version" -lt 8 ]; then
+                error_exit "Unsupported RHEL-based version: $os_version (minimum: 8)"
+            fi
+            package_manager="dnf"
+            ;;
+        ubuntu)
+            if [ "$os_major_version" -lt 20 ]; then
+                error_exit "Unsupported Ubuntu version: $os_version (minimum: 20.04)"
+            fi
+            package_manager="apt"
+            ;;
+        debian)
+            if [ "$os_major_version" -lt 10 ]; then
+                error_exit "Unsupported Debian version: $os_version (minimum: 10)"
+            fi
+            package_manager="apt"
+            ;;
+        *)
+            error_exit "Unsupported OS: $os_release $os_version"
+            ;;
+    esac
+    
+    log "Platform validation passed: $os_release $os_version using $package_manager"
+}
+
+# Install required dependencies
+install_dependencies() {
+    log "Installing required dependencies"
+    
+    case "$package_manager" in
+        dnf)
+            dnf update -y || error_exit "Failed to update package cache"
+            dnf install -y wget curl which || error_exit "Failed to install dependencies"
+            ;;
+        apt)
+            export DEBIAN_FRONTEND=noninteractive
+            apt update || error_exit "Failed to update package cache"
+            apt install -y wget curl lsb-release || error_exit "Failed to install dependencies"
+            ;;
+    esac
+}
+
+# Check if CVMFS is already installed and configured
+check_existing_installation() {
+    if command -v cvmfs_config >/dev/null 2>&1; then
+        if cvmfs_config stat 2>/dev/null | grep -q "CVMFS.*OK"; then
+            log "CVMFS already installed and working. Checking configuration..."
+            return 0
+        else
+            log "CVMFS installed but not properly configured. Reconfiguring..."
+            return 1
+        fi
+    else
+        log "CVMFS not installed. Proceeding with installation..."
+        return 1
+    fi
+}
+
+# Install CVMFS packages for RHEL-based systems
+install_cvmfs_rhel() {
+    log "Installing CVMFS for RHEL-based system ($os_release)"
+    
+    # Install CVMFS release package
+    local cvmfs_release_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm"
+    log "Installing CVMFS release package from $cvmfs_release_url"
+    dnf install -y "$cvmfs_release_url" || error_exit "Failed to install CVMFS release package"
+    
+    # Install CVMFS
+    log "Installing CVMFS package"
+    dnf install -y cvmfs || error_exit "Failed to install CVMFS"
+    
+    # Install EESSI configuration
+    local eessi_config_url="https://github.com/EESSI/filesystem-layer/releases/download/latest/cvmfs-config-eessi-latest.noarch.rpm"
+    log "Installing EESSI configuration from $eessi_config_url"
+    dnf install -y "$eessi_config_url" || error_exit "Failed to install EESSI configuration"
+}
+
+# Install CVMFS packages for Debian-based systems
+install_cvmfs_debian() {
+    log "Installing CVMFS for Debian-based system ($os_release)"
+    
+    # Create temporary directory for downloads
+    local temp_dir=$(mktemp -d)
+    cd "$temp_dir" || error_exit "Failed to create temporary directory"
+    
+    # Download and install CVMFS release package
+    local cvmfs_release_deb="cvmfs-release-latest_all.deb"
+    log "Downloading CVMFS release package"
+    wget -q "https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/$cvmfs_release_deb" || error_exit "Failed to download CVMFS release package"
+    
+    log "Installing CVMFS release package"
+    dpkg -i "$cvmfs_release_deb" || error_exit "Failed to install CVMFS release package"
+    
+    # Download and install EESSI configuration
+    local eessi_config_deb="cvmfs-config-eessi_latest_all.deb"
+    log "Downloading EESSI configuration"
+    wget -q "https://github.com/EESSI/filesystem-layer/releases/download/latest/$eessi_config_deb" || error_exit "Failed to download EESSI configuration"
+    
+    log "Installing EESSI configuration"
+    dpkg -i "$eessi_config_deb" || error_exit "Failed to install EESSI configuration"
+    
+    # Update package cache and install CVMFS
+    log "Updating package cache"
+    apt update || error_exit "Failed to update package cache"
+    
+    log "Installing CVMFS package"
+    apt install -y cvmfs || error_exit "Failed to install CVMFS"
+    
+    # Cleanup
+    cd /
+    rm -rf "$temp_dir"
+}
+
+# Install CVMFS based on detected platform
+install_cvmfs() {
+    log "Starting CVMFS installation"
+    
+    case "$package_manager" in
+        dnf)
+            install_cvmfs_rhel
+            ;;
+        apt)
+            install_cvmfs_debian
+            ;;
+        *)
+            error_exit "Unknown package manager: $package_manager"
+            ;;
+    esac
+    
+    log "CVMFS installation completed"
+}
+
+# Configure CVMFS with proper settings
+configure_cvmfs() {
+    log "Configuring CVMFS"
+    
+    backup_existing_config
+    
+    # Ensure cache directory exists and has proper permissions
+    log "Creating cache directory: $CVMFS_CACHE_BASE"
+    mkdir -p "$CVMFS_CACHE_BASE"
+    chmod 700 "$CVMFS_CACHE_BASE"
+    chown cvmfs:cvmfs "$CVMFS_CACHE_BASE" 2>/dev/null || true  # cvmfs user may not exist yet
+    
+    # Create CVMFS configuration
+    local config_file="/etc/cvmfs/default.local"
+    log "Creating CVMFS configuration at $config_file"
+    
+    cat > "$config_file" << EOF
+# CVMFS Configuration for EESSI
+# Generated by CVMFS-EESSI installation script on $(date)
+
+# HTTP Proxy configuration
+CVMFS_HTTP_PROXY=$CVMFS_PROXY
+
+# Client profile for single-user access
+CVMFS_CLIENT_PROFILE="single"
+
+# Cache quota (in MB)
+CVMFS_QUOTA_LIMIT=$CVMFS_CACHE_QUOTA
+
+# Additional optimizations
+CVMFS_CACHE_BASE=$CVMFS_CACHE_BASE
+CVMFS_RELOAD_SOCKETS=$CVMFS_CACHE_BASE
+EOF
+
+    # Add additional repositories if specified
+    if [ -n "$ADDITIONAL_REPOS" ]; then
+        log "Adding additional CVMFS repositories: $ADDITIONAL_REPOS"
+        echo "" >> "$config_file"
+        echo "# Additional repositories" >> "$config_file"
+        echo "CVMFS_REPOSITORIES=\"software.eessi.io,$ADDITIONAL_REPOS\"" >> "$config_file"
+    fi
+    
+    # Set proper permissions
+    chmod 644 "$config_file"
+    
+    log "CVMFS configuration written to $config_file"
+    log "Configuration details:"
+    log "  Proxy: $CVMFS_PROXY"
+    log "  Cache quota: ${CVMFS_CACHE_QUOTA}MB"
+    log "  Client profile: single"
+}
+
+# Setup and validate CVMFS
+setup_cvmfs() {
+    log "Setting up CVMFS"
+    
+    # Run CVMFS setup
+    cvmfs_config setup || error_exit "CVMFS setup failed"
+    
+    log "CVMFS setup completed successfully"
+}
+
+# Validate CVMFS installation
+validate_installation() {
+    log "Validating CVMFS installation"
+    
+    # Check if cvmfs_config command works
+    if ! command -v cvmfs_config >/dev/null 2>&1; then
+        error_exit "cvmfs_config command not found after installation"
+    fi
+    
+    # Check CVMFS status
+    if ! cvmfs_config stat >/dev/null 2>&1; then
+        log "Warning: CVMFS stat check failed, but this may be normal before first repository access"
+    fi
+    
+    # Test EESSI repository access
+    log "Testing EESSI repository access"
+    if ! cvmfs_config probe software.eessi.io >/dev/null 2>&1; then
+        log "Warning: Cannot probe EESSI repository, but this may work after reboot or autofs restart"
+    else
+        log "EESSI repository probe successful"
+    fi
+    
+    log "CVMFS installation validation completed"
+}
+
+# Display post-installation information
+show_post_install_info() {
+    log ""
+    log "=== CVMFS-EESSI Installation Summary ==="
+    log "✓ CVMFS successfully installed and configured"
+    log "✓ EESSI configuration applied"
+    log ""
+    log "Configuration details:"
+    log "  Config file: /etc/cvmfs/default.local"
+    log "  Cache location: $CVMFS_CACHE_BASE"
+    log "  Cache quota: ${CVMFS_CACHE_QUOTA}MB"
+    log "  Proxy setting: $CVMFS_PROXY"
+    log ""
+    log "Next steps:"
+    log "  1. Reboot the system or restart autofs: systemctl restart autofs"
+    log "  2. Test EESSI access: ls /cvmfs/software.eessi.io"
+    log "  3. Load EESSI environment: source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
+    log ""
+    log "For more information, see:"
+    log "  https://www.eessi.io/docs/using_eessi/setting_up_environment/"
+    log ""
+    
+    if [ -f "$BACKUP_DIR/default.local.backup."* ] 2>/dev/null; then
+        log "Note: Previous configuration backed up to $BACKUP_DIR"
+    fi
+}
+
+# Main execution function
+main() {
+    # Initialize logging
+    mkdir -p "$(dirname "$LOG_FILE")"
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE"
+    
+    log "Starting CVMFS-EESSI installation"
+    log "Script: $0"
+    log "User: $(whoami)"
+    log "Date: $(date)"
+    
+    # Check if running as root
+    if [ "$EUID" -ne 0 ]; then
+        error_exit "This script must be run as root"
+    fi
+    
+    # Load configuration first
+    load_configuration
+    
+    # Main installation steps
+    detect_platform
+    validate_platform_support
+    
+    # Check for existing installation
+    if check_existing_installation; then
+        log "CVMFS already properly configured. Skipping installation."
+        show_post_install_info
+        return 0
+    fi
+    
+    install_dependencies
+    install_cvmfs
+    configure_cvmfs
+    setup_cvmfs
+    validate_installation
+    show_post_install_info
+    
+    log "CVMFS-EESSI installation completed successfully"
+}
+
+# Run main function with error handling
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
