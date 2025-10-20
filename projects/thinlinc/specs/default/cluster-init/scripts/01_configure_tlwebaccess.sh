@@ -66,6 +66,70 @@ validate_thinlinc_installation() {
     log "ThinLinc installation validation passed"
 }
 
+# Detect Linux distribution
+detect_linux_distribution() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    elif [ -f /etc/redhat-release ]; then
+        echo "rhel"
+    elif [ -f /etc/debian_version ]; then
+        echo "ubuntu"
+    else
+        error_exit "Unable to detect Linux distribution"
+    fi
+}
+
+# Install OATH packages based on distribution
+install_oath_packages() {
+    log "Installing OATH authentication packages"
+    
+    local distro
+    distro=$(detect_linux_distribution)
+    
+    case "$distro" in
+        "rhel"|"centos"|"rocky"|"almalinux"|"fedora")
+            log "Detected RHEL-based system: $distro"
+            
+            # Install EPEL repository if not already installed
+            if ! rpm -q epel-release &>/dev/null; then
+                log "Installing EPEL repository"
+                if command -v dnf &>/dev/null; then
+                    dnf install -y epel-release || error_exit "Failed to install EPEL repository"
+                else
+                    yum install -y epel-release || error_exit "Failed to install EPEL repository"
+                fi
+            fi
+            
+            # Install packages
+            log "Installing pam_oath and oathtool packages"
+            if command -v dnf &>/dev/null; then
+                dnf install -y pam_oath oathtool || error_exit "Failed to install OATH packages"
+            else
+                yum install -y pam_oath oathtool || error_exit "Failed to install OATH packages"
+            fi
+            ;;
+            
+        "ubuntu"|"debian")
+            log "Detected Debian-based system: $distro"
+            
+            # Update package list
+            log "Updating package list"
+            apt-get update || error_exit "Failed to update package list"
+            
+            # Install packages
+            log "Installing libpam-oath and oathtool packages"
+            apt-get install -y libpam-oath oathtool || error_exit "Failed to install OATH packages"
+            ;;
+            
+        *)
+            error_exit "Unsupported Linux distribution: $distro"
+            ;;
+    esac
+    
+    log "OATH packages installed successfully"
+}
+
 # Create backup of PAM configuration
 backup_pam_configuration() {
     log "Creating backup of PAM configuration"
@@ -234,6 +298,7 @@ main() {
     validate_thinlinc_installation
     
     if [ "$enable_web" = "True" ]; then
+        install_oath_packages
         enable_web_access
     else
         disable_web_access
