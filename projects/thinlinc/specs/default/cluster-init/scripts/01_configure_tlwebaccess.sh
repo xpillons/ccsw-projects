@@ -130,6 +130,54 @@ install_oath_packages() {
     log "OATH packages installed successfully"
 }
 
+# Configure PAM OATH authentication for ThinLinc
+configure_pam_oath() {
+    log "Configuring PAM OATH authentication for ThinLinc"
+    
+    local pam_thinlinc="/etc/pam.d/thinlinc"
+    local pam_backup="${pam_thinlinc}.pre-oath.$(date +%Y%m%d_%H%M%S)"
+    local oath_line="auth\t  sufficient  pam_oath.so usersfile=/shared/home/\${USER}/.oath-secrets window=9999 digits=6"
+    
+    # Check if ThinLinc PAM file exists
+    if [ ! -f "$pam_thinlinc" ]; then
+        error_exit "ThinLinc PAM configuration file not found: $pam_thinlinc"
+    fi
+    
+    # Create backup before modifying
+    log "Creating backup of ThinLinc PAM configuration"
+    cp "$pam_thinlinc" "$pam_backup" || error_exit "Failed to backup ThinLinc PAM configuration"
+    log "Backup created: $pam_backup"
+    
+    # Check if OATH line already exists
+    if grep -q "pam_oath.so" "$pam_thinlinc"; then
+        log "OATH authentication already configured in ThinLinc PAM"
+        return 0
+    fi
+    
+    # Add OATH authentication line at the beginning of auth section
+    log "Adding OATH authentication to ThinLinc PAM configuration"
+    
+    # Create temporary file with OATH line inserted
+    local temp_file="/tmp/thinlinc_pam_temp.$$"
+    {
+        echo -e "$oath_line"
+        cat "$pam_thinlinc"
+    } > "$temp_file"
+    
+    # Replace original file
+    if ! mv "$temp_file" "$pam_thinlinc"; then
+        error_exit "Failed to update ThinLinc PAM configuration"
+    fi
+    
+    # Set proper permissions
+    chmod 644 "$pam_thinlinc" || error_exit "Failed to set PAM configuration permissions"
+    
+    log "PAM OATH authentication configured successfully"
+    log "Users must create ~/.oath-secrets file with their OATH tokens"
+    log "Format: HOTP/TOTP <username> <type> <key> [counter]"
+    log "Example: TOTP alice TOTP/E/30/6 JBSWY3DPEHPK3PXP"
+}
+
 # Create backup of PAM configuration
 backup_pam_configuration() {
     log "Creating backup of PAM configuration"
@@ -146,6 +194,10 @@ backup_pam_configuration() {
         cp "$backup_file" "${backup_file}.backup.$(date +%Y%m%d_%H%M%S)"
     fi
     
+	# If thinlinc PAM config is a symlink, remove it before copying
+	if [ -L "$backup_file" ]; then
+		rm -f "$backup_file" || error_exit "Failed to remove existing symlinked PAM configuration"
+	fi
     cp "$source_file" "$backup_file" || error_exit "Failed to copy PAM configuration"
     log "PAM configuration backed up successfully"
 }
@@ -190,6 +242,8 @@ configure_proxy_settings() {
         error_exit "Failed to update href URL in vnc.tmpl"
     fi
     
+	# Replace websocket with "rnode/$(hostname)/port/websocket"
+	sed -i -e "s/websocket\//${proxy_base_url}websocket\//" $TL_ROOT/modules/thinlinc/tlwebaccess/agent.py
     log "Proxy settings configured successfully"
 }
 
@@ -247,6 +301,7 @@ enable_web_access() {
     log "Enabling ThinLinc Web Access"
     
     backup_pam_configuration
+    configure_pam_oath
     configure_web_port
     configure_proxy_settings
     restart_tlwebaccess_service
