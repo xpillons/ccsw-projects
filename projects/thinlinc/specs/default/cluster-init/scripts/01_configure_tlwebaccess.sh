@@ -178,6 +178,72 @@ configure_pam_oath() {
     log "Example: TOTP alice TOTP/E/30/6 JBSWY3DPEHPK3PXP"
 }
 
+# Configure SSH for OATH authentication
+configure_ssh_oath() {
+    log "Configuring SSH for OATH authentication"
+    
+    local sshd_config="/etc/ssh/sshd_config"
+    local sshd_backup="${sshd_config}.pre-oath.$(date +%Y%m%d_%H%M%S)"
+    
+    # Check if SSH config file exists
+    if [ ! -f "$sshd_config" ]; then
+        error_exit "SSH configuration file not found: $sshd_config"
+    fi
+    
+    # Create backup before modifying
+    log "Creating backup of SSH configuration"
+    cp "$sshd_config" "$sshd_backup" || error_exit "Failed to backup SSH configuration"
+    log "Backup created: $sshd_backup"
+    
+    # Configure SSH settings for OATH
+    log "Updating SSH configuration for OATH authentication"
+    
+    # Function to update or add SSH configuration parameter
+    update_ssh_param() {
+        local param="$1"
+        local value="$2"
+        local config_file="$3"
+        
+        if grep -q "^[[:space:]]*${param}" "$config_file"; then
+            # Parameter exists, update it
+            sed -i "s/^[[:space:]]*${param}.*/${param} ${value}/" "$config_file"
+        else
+            # Parameter doesn't exist, add it
+            echo "${param} ${value}" >> "$config_file"
+        fi
+    }
+    
+    # Update SSH parameters
+    update_ssh_param "ChallengeResponseAuthentication" "yes" "$sshd_config"
+    update_ssh_param "PasswordAuthentication" "no" "$sshd_config"
+    update_ssh_param "KbdInteractiveAuthentication" "yes" "$sshd_config"
+    update_ssh_param "UsePAM" "yes" "$sshd_config"
+    
+    # Validate SSH configuration
+    log "Validating SSH configuration"
+    if ! sshd -t; then
+        log "ERROR: SSH configuration validation failed, restoring backup"
+        cp "$sshd_backup" "$sshd_config" || error_exit "Failed to restore SSH configuration backup"
+        error_exit "SSH configuration is invalid"
+    fi
+    
+    # Restart SSH service
+    log "Restarting SSH service to apply changes"
+    if ! systemctl restart sshd; then
+        log "WARNING: Failed to restart SSH service automatically"
+        log "Please restart SSH service manually: systemctl restart sshd"
+    else
+        log "SSH service restarted successfully"
+    fi
+    
+    log "SSH OATH authentication configured successfully"
+    log "SSH Configuration changes:"
+    log "  ChallengeResponseAuthentication: yes"
+    log "  PasswordAuthentication: no"
+    log "  KbdInteractiveAuthentication: yes"
+    log "  UsePAM: yes"
+}
+
 # Create backup of PAM configuration
 backup_pam_configuration() {
     log "Creating backup of PAM configuration"
@@ -302,6 +368,7 @@ enable_web_access() {
     
     backup_pam_configuration
     configure_pam_oath
+    configure_ssh_oath
     configure_web_port
     configure_proxy_settings
     restart_tlwebaccess_service
