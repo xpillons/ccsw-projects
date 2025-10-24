@@ -309,7 +309,11 @@ configure_proxy_settings() {
     fi
     
 	# Replace websocket with "rnode/$(hostname)/port/websocket"
-	sed -i -e "s/websocket\//${proxy_base_url}websocket\//" $TL_ROOT/modules/thinlinc/tlwebaccess/agent.py
+    log "Updating websocket proxy in agent.py"
+    if ! sed -i -e "s/websocket\//\/${proxy_base_url}websocket\//" "$TL_ROOT/modules/thinlinc/tlwebaccess/agent.py"; then
+        error_exit "Failed to update websocket URL in agent.py"
+    fi
+	
     log "Proxy settings configured successfully"
 }
 
@@ -371,6 +375,7 @@ enable_web_access() {
     configure_ssh_oath
     configure_web_port
     configure_proxy_settings
+    thinlinc.enable_web
     restart_tlwebaccess_service
     
     log "ThinLinc Web Access enabled and configured successfully"
