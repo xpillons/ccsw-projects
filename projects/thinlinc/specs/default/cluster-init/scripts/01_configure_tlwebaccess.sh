@@ -375,7 +375,6 @@ enable_web_access() {
     configure_ssh_oath
     configure_web_port
     configure_proxy_settings
-    thinlinc.enable_web
     restart_tlwebaccess_service
     
     log "ThinLinc Web Access enabled and configured successfully"
