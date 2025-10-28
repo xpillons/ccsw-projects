@@ -12,6 +12,106 @@ This project provides automated installation and configuration of CVMFS (CernVM 
 - **Backup & Recovery**: Automatic backup of existing configurations
 - **Detailed Logging**: Timestamped logs for troubleshooting
 - **Validation**: Post-installation verification and testing
+- **GPU Support**: Automatic NVIDIA GPU detection and EESSI GPU library linking
+
+## 🎮 GPU Support
+
+The installation script automatically detects NVIDIA GPUs and configures EESSI for GPU-accelerated applications.
+
+### Automatic GPU Detection
+
+The script uses multiple detection methods:
+- **Primary**: `nvidia-smi` command availability and execution
+- **Secondary**: NVIDIA driver detection in `/proc/driver/nvidia`
+- **Fallback**: PCI device scanning via `lspci`
+
+### GPU Configuration Process
+
+When NVIDIA GPUs are detected, the script automatically:
+
+1. **Waits for EESSI repository access** (up to 30 attempts with 5-second intervals)
+2. **Loads EESSI environment**: `source /cvmfs/software.eessi.io/versions/2023.06/init/bash`
+3. **Links NVIDIA host libraries**: Runs the official EESSI NVIDIA linking script
+4. **Verifies GPU support**: Confirms driver and CUDA version detection
+
+### Manual GPU Setup
+
+If automatic setup fails or for manual configuration:
+
+```bash
+# Load EESSI environment
+source /cvmfs/software.eessi.io/versions/2023.06/init/bash
+
+# Run NVIDIA host libraries linking script
+/cvmfs/software.eessi.io/versions/2023.06/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh
+
+# Verify GPU access
+nvidia-smi
+```
+
+### Supported GPU Configurations
+
+| Azure VM Series | GPU Type | CUDA Support | Status |
+|-----------------|----------|--------------|---------|
+| **NVadsA10v5-series** | A10 | ✅ CUDA 12.4+ | ✅ Supported |
+
+### GPU Application Examples
+
+After successful GPU setup, you can use GPU-accelerated applications from EESSI:
+
+```bash
+# Load EESSI environment
+source /cvmfs/software.eessi.io/versions/2023.06/init/bash
+
+# Example: GPU-accelerated GROMACS
+module load GROMACS
+gmx --version  # Should show GPU support
+
+# Example: TensorFlow with GPU
+module load TensorFlow
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+
+# Example: PyTorch with CUDA
+module load PyTorch
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+### GPU Troubleshooting
+
+#### GPU Not Detected
+
+```bash
+# Check if NVIDIA drivers are installed
+nvidia-smi
+
+# Verify GPU devices in system
+lspci | grep -i nvidia
+
+# Check NVIDIA driver installation
+ls /proc/driver/nvidia/
+```
+
+#### GPU Libraries Not Linked
+
+```bash
+# Manually run EESSI GPU setup
+source /cvmfs/software.eessi.io/versions/2023.06/init/bash
+/cvmfs/software.eessi.io/versions/2023.06/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh
+
+# Check CUDA library paths
+echo $LD_LIBRARY_PATH | grep cuda
+```
+
+#### Application Can't Find GPU
+
+```bash
+# Verify CUDA runtime
+nvidia-smi
+
+# Check application GPU support
+module load <application>
+<application> --help | grep -i gpu
+```
 
 ## 📋 Prerequisites
 
@@ -155,8 +255,23 @@ sudo cvmfs_config showconfig | grep QUOTA
 - **Installation Log**: `/var/log/cvmfs-eessi-install.log`
 - **CVMFS Logs**: `/var/log/cvmfs/*.log`
 - **System Logs**: `journalctl -u cvmfs`
+- **GPU Setup**: Check `[GPU Setup]` entries in installation log
 
 ### Common Issues
+
+#### GPU Support Issues
+
+```bash
+# Check if GPU was detected during installation
+grep "NVIDIA GPU" /var/log/cvmfs-eessi-install.log
+
+# Verify GPU configuration status
+grep "GPU Setup" /var/log/cvmfs-eessi-install.log
+
+# Manual GPU setup if automatic failed
+source /cvmfs/software.eessi.io/versions/2023.06/init/bash
+/cvmfs/software.eessi.io/versions/2023.06/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh
+```
 
 #### EESSI Repository Not Accessible
 
@@ -239,6 +354,12 @@ CVMFS_PROXY=http://squid-proxy:3128
 - Use cluster-wide NFS or Lustre for consistency across compute nodes
 - Single cache reduces network traffic for frequently accessed software
 
+**GPU-Enabled Clusters:**
+- GPU support is automatically configured when NVIDIA devices are detected
+- EESSI provides GPU-optimized versions of popular applications (GROMACS, TensorFlow, PyTorch)
+- GPU applications benefit from fast storage for model/data loading: use NVMe when available
+- Monitor GPU memory usage alongside CVMFS cache for optimal performance
+
 ## 🔄 Updates & Maintenance
 
 ### Updating EESSI Configuration
@@ -283,6 +404,8 @@ For issues and questions:
 3. Test repository access: `ls /cvmfs/software.eessi.io`
 4. Check cache usage: `df -h $(sudo cvmfs_config showconfig | grep CVMFS_CACHE_BASE | cut -d= -f2)`
 5. Verify storage detection: Look for "Storage type:" in the installation log
+6. **GPU Issues**: Check for "NVIDIA GPU" and "GPU Setup" entries in logs
+7. **GPU Manual Setup**: Run EESSI GPU linking script manually if needed
 
 ## 📄 License
 

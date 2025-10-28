@@ -346,6 +346,128 @@ validate_installation() {
     log "CVMFS installation validation completed"
 }
 
+# Detect NVIDIA GPU devices
+detect_nvidia_gpu() {
+    log "Checking for NVIDIA GPU devices"
+    
+    # Check if nvidia-smi command exists and works
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        if nvidia-smi >/dev/null 2>&1; then
+            local gpu_count=$(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | wc -l)
+            log "Detected $gpu_count NVIDIA GPU(s):"
+            nvidia-smi --query-gpu=name,driver_version --format=csv,noheader,nounits | while read line; do
+                log "  $line"
+            done
+            return 0
+        else
+            debug_log "nvidia-smi command exists but failed to execute"
+        fi
+    else
+        debug_log "nvidia-smi command not found"
+    fi
+    
+    # Alternative: Check for NVIDIA devices in /proc/driver/nvidia
+    if [ -d "/proc/driver/nvidia" ]; then
+        log "NVIDIA driver detected in /proc/driver/nvidia"
+        return 0
+    fi
+    
+    # Alternative: Check lspci for NVIDIA devices
+    if command -v lspci >/dev/null 2>&1; then
+        if lspci | grep -i nvidia >/dev/null 2>&1; then
+            log "NVIDIA device detected via lspci:"
+            lspci | grep -i nvidia | while read line; do
+                log "  $line"
+            done
+            return 0
+        fi
+    fi
+    
+    debug_log "No NVIDIA GPU devices detected"
+    return 1
+}
+
+# Setup NVIDIA GPU support for EESSI
+setup_nvidia_gpu_support() {
+    log "Setting up NVIDIA GPU support for EESSI"
+    
+    # Verify EESSI repository is accessible
+    local eessi_version="2023.06"
+    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/bash"
+    local nvidia_link_script="/cvmfs/software.eessi.io/versions/$eessi_version/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
+    
+    # Wait for CVMFS to be ready and check EESSI access
+    local max_attempts=30
+    local attempt=1
+    
+    log "Waiting for EESSI repository to become accessible..."
+    while [ $attempt -le $max_attempts ]; do
+        if [ -f "$eessi_init_script" ]; then
+            log "EESSI repository is accessible"
+            break
+        fi
+        
+        debug_log "Attempt $attempt/$max_attempts: EESSI not yet accessible, waiting..."
+        sleep 5
+        ((attempt++))
+        
+        # Try to trigger autofs mount
+        ls /cvmfs/software.eessi.io >/dev/null 2>&1 || true
+    done
+    
+    if [ ! -f "$eessi_init_script" ]; then
+        log "WARNING: EESSI repository not accessible after $max_attempts attempts"
+        log "GPU support setup will be skipped"
+        log "You may need to run this manually after reboot:"
+        log "  source $eessi_init_script"
+        log "  $nvidia_link_script"
+        return 1
+    fi
+    
+    # Check if NVIDIA link script exists
+    if [ ! -f "$nvidia_link_script" ]; then
+        log "WARNING: NVIDIA link script not found at $nvidia_link_script"
+        log "This may indicate an EESSI version compatibility issue"
+        return 1
+    fi
+    
+    log "Loading EESSI environment and setting up NVIDIA GPU support"
+    
+    # Run EESSI setup directly
+    log "Loading EESSI environment"
+    if ! source "$eessi_init_script"; then
+        log "WARNING: Failed to load EESSI environment"
+        log "You may need to run this manually after reboot:"
+        log "  source $eessi_init_script"
+        log "  $nvidia_link_script"
+        return 1
+    fi
+    
+    log "EESSI environment loaded successfully"
+    log "Running NVIDIA host libraries linking script"
+    
+    # Run the NVIDIA linking script
+    if "$nvidia_link_script"; then
+        log "NVIDIA host libraries linking completed successfully"
+        log "GPU applications should now work with EESSI"
+        
+        # Verify GPU support
+        if command -v nvidia-smi >/dev/null 2>&1; then
+            log "NVIDIA driver verification:"
+            nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader,nounits 2>/dev/null | while read line; do
+                log "  $line"
+            done
+        fi
+        
+        log "NVIDIA GPU support setup completed successfully"
+    else
+        log "WARNING: NVIDIA GPU support setup failed"
+        log "You may need to run this manually after reboot:"
+        log "  source $eessi_init_script"
+        log "  $nvidia_link_script"
+    fi
+}
+
 # Display post-installation information
 show_post_install_info() {
     log ""
@@ -363,6 +485,18 @@ show_post_install_info() {
     log "  1. Reboot the system or restart autofs: systemctl restart autofs"
     log "  2. Test EESSI access: ls /cvmfs/software.eessi.io"
     log "  3. Load EESSI environment: source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
+    
+    # Add GPU-specific information if GPU was detected
+    if detect_nvidia_gpu >/dev/null 2>&1; then
+        log ""
+        log "GPU Support:"
+        log "  ✓ NVIDIA GPU detected and configured"
+        log "  4. For GPU applications, manually source EESSI and run link script:"
+        log "     source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
+        log "     /cvmfs/software.eessi.io/versions/2023.06/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
+        log "  5. Test GPU access: nvidia-smi"
+    fi
+    
     log ""
     log "For more information, see:"
     log "  https://www.eessi.io/docs/using_eessi/setting_up_environment/"
@@ -409,6 +543,14 @@ main() {
     configure_cvmfs
     setup_cvmfs
     validate_installation
+    
+    # Setup GPU support if NVIDIA devices detected
+    if detect_nvidia_gpu; then
+        setup_nvidia_gpu_support
+    else
+        log "No NVIDIA GPU detected, skipping GPU support setup"
+    fi
+    
     show_post_install_info
     
     log "CVMFS-EESSI installation completed successfully"
