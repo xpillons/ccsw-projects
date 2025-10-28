@@ -443,10 +443,9 @@ setup_nvidia_gpu_support() {
         return 1
     fi
 
-    cvmfs_config setup || error_exit "CVMFS setup failed before NVIDIA linking"
-
     log "EESSI environment loaded successfully"
     log "Running NVIDIA host libraries linking script"
+    set +u # to avoid error EESSI_COMPAT_LAYER_DIR: unbound variable
     
     # Run the NVIDIA linking script
     if "$nvidia_link_script"; then
@@ -468,6 +467,7 @@ setup_nvidia_gpu_support() {
         log "  source $eessi_init_script"
         log "  $nvidia_link_script"
     fi
+    set -u
 }
 
 # Display post-installation information
