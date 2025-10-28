@@ -395,7 +395,7 @@ setup_nvidia_gpu_support() {
     local eessi_version="2023.06"
     local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/bash"
     local nvidia_link_script="/cvmfs/software.eessi.io/versions/$eessi_version/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
-    
+
     # Wait for CVMFS to be ready and check EESSI access
     local max_attempts=30
     local attempt=1
@@ -442,7 +442,9 @@ setup_nvidia_gpu_support() {
         log "  $nvidia_link_script"
         return 1
     fi
-    
+
+    cvmfs_config setup || error_exit "CVMFS setup failed before NVIDIA linking"
+
     log "EESSI environment loaded successfully"
     log "Running NVIDIA host libraries linking script"
     
