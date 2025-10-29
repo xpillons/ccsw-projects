@@ -434,6 +434,7 @@ setup_nvidia_gpu_support() {
     log "Loading EESSI environment and setting up NVIDIA GPU support"
     
     # Run EESSI setup directly
+    set +u
     log "Loading EESSI environment"
     if ! source "$eessi_init_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "WARNING: Failed to load EESSI environment"
@@ -466,7 +467,7 @@ setup_nvidia_gpu_support() {
         log "  source $eessi_init_script"
         log "  $nvidia_link_script"
     fi
-    #set -u
+    set -u
 }
 
 # Display post-installation information
