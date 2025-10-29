@@ -435,7 +435,7 @@ setup_nvidia_gpu_support() {
     
     # Run EESSI setup directly
     log "Loading EESSI environment"
-    if ! source "$eessi_init_script"; then
+    if ! source "$eessi_init_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "WARNING: Failed to load EESSI environment"
         log "You may need to run this manually after reboot:"
         log "  source $eessi_init_script"
@@ -448,7 +448,7 @@ setup_nvidia_gpu_support() {
     #set +u # to avoid error EESSI_COMPAT_LAYER_DIR: unbound variable
 
     # Run the NVIDIA linking script
-    if "$nvidia_link_script"; then
+    if "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "NVIDIA host libraries linking completed successfully"
         log "GPU applications should now work with EESSI"
         
