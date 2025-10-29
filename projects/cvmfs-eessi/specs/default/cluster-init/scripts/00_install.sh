@@ -4,7 +4,7 @@
 #
 # This script installs and configures CVMFS with EESSI support for CycleCloud clusters
 
-set -euo pipefail
+set -eo pipefail
 
 # Global variables
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
