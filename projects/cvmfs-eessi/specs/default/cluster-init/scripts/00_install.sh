@@ -446,7 +446,7 @@ setup_nvidia_gpu_support() {
     log "EESSI environment loaded successfully"
     log "Running NVIDIA host libraries linking script"
     #set +u # to avoid error EESSI_COMPAT_LAYER_DIR: unbound variable
-
+    export EESSI_COMPAT_LAYER_DIR=""
     # Run the NVIDIA linking script
     if "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "NVIDIA host libraries linking completed successfully"
