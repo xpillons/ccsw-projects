@@ -393,7 +393,7 @@ setup_nvidia_gpu_support() {
     
     # Verify EESSI repository is accessible
     local eessi_version="2023.06"
-    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/eessi_env"
+    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/minimal_eessi_env"
     local nvidia_link_script="/cvmfs/software.eessi.io/versions/$eessi_version/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
 
     # Wait for CVMFS to be ready and check EESSI access
