@@ -462,7 +462,7 @@ setup_nvidia_gpu_support() {
         # Verify GPU support
         if command -v nvidia-smi >/dev/null 2>&1; then
             log "NVIDIA driver verification:"
-            nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader,nounits 2>/dev/null | while read line; do
+            nvidia-smi --query-gpu=name,driver_version --format=csv,noheader,nounits 2>/dev/null | while read line; do
                 log "  $line"
             done
         fi
