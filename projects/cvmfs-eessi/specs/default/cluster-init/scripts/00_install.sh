@@ -393,7 +393,7 @@ setup_nvidia_gpu_support() {
     
     # Verify EESSI repository is accessible
     local eessi_version="2023.06"
-    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/eessi_environment_variables"
+    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/lmod/bash"
     local nvidia_link_script="/cvmfs/software.eessi.io/versions/$eessi_version/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
 
     # Wait for CVMFS to be ready and check EESSI access
@@ -445,7 +445,7 @@ setup_nvidia_gpu_support() {
 
     log "EESSI environment loaded successfully"
     log "Running NVIDIA host libraries linking script"
-    set +u # to avoid error EESSI_COMPAT_LAYER_DIR: unbound variable
+    #set +u # to avoid error EESSI_COMPAT_LAYER_DIR: unbound variable
     # Run the NVIDIA linking script
     if "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "NVIDIA host libraries linking completed successfully"
@@ -466,7 +466,7 @@ setup_nvidia_gpu_support() {
         log "  source $eessi_init_script"
         log "  $nvidia_link_script"
     fi
-    set -u
+    #set -u
 }
 
 # Display post-installation information
