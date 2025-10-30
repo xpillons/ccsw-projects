@@ -436,6 +436,7 @@ setup_nvidia_gpu_support() {
     # Run EESSI setup directly
     log "Loading EESSI environment"
     export EESSI_COMPAT_LAYER_DIR=/cvmfs/software.eessi.io/versions/2023.06/compat/linux/$(uname -m)
+    set +u
     if ! source "$eessi_init_script"; then
         log "WARNING: Failed to load EESSI environment"
         log "You may need to run this manually after reboot:"
@@ -443,6 +444,7 @@ setup_nvidia_gpu_support() {
         log "  $nvidia_link_script"
         return 1
     fi
+    set -u
 
     log "EESSI environment loaded successfully"
     log "Running NVIDIA host libraries linking script"
@@ -483,19 +485,15 @@ show_post_install_info() {
     log "  Proxy setting: $CVMFS_PROXY"
     log ""
     log "Next steps:"
-    log "  1. Reboot the system or restart autofs: systemctl restart autofs"
-    log "  2. Test EESSI access: ls /cvmfs/software.eessi.io"
-    log "  3. Load EESSI environment: source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
+    log "  1. Test EESSI access: ls /cvmfs/software.eessi.io"
+    log "  2. Load EESSI environment: source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
     
     # Add GPU-specific information if GPU was detected
     if detect_nvidia_gpu >/dev/null 2>&1; then
         log ""
         log "GPU Support:"
-        log "  ✓ NVIDIA GPU detected and configured"
-        log "  4. For GPU applications, manually source EESSI and run link script:"
-        log "     source /cvmfs/software.eessi.io/versions/2023.06/init/bash"
-        log "     /cvmfs/software.eessi.io/versions/2023.06/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
-        log "  5. Test GPU access: nvidia-smi"
+        log "  ✓ NVIDIA GPU detected and configured automatically"
+        log "  3. Test GPU access: nvidia-smi"
     fi
     
     log ""
