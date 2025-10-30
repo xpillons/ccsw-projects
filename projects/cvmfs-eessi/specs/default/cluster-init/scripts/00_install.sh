@@ -8,6 +8,19 @@ set -euo pipefail
 
 # Global variables
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+LOG_FILE="/var/log/cvmfs-eessi-install.log"
+
+# Logging function to prefix messages with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+# Debug logging function (only logs if DEBUG_LOGGING is true)
+debug_log() {
+    if [ "${DEBUG_LOGGING:-false}" = "true" ]; then
+        log "DEBUG: $*"
+    fi
+}
 
 # Load configuration from environment file if it exists
 load_configuration() {
@@ -63,20 +76,6 @@ load_configuration() {
     log "  Debug logging: $DEBUG_LOGGING"
     if [ -n "$ADDITIONAL_REPOS" ]; then
         log "  Additional repos: $ADDITIONAL_REPOS"
-    fi
-}
-
-LOG_FILE="/var/log/cvmfs-eessi-install.log"
-
-# Logging function to prefix messages with timestamp
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
-}
-
-# Debug logging function (only logs if DEBUG_LOGGING is true)
-debug_log() {
-    if [ "${DEBUG_LOGGING:-false}" = "true" ]; then
-        log "DEBUG: $*"
     fi
 }
 
@@ -149,6 +148,7 @@ validate_platform_support() {
             ;;
     esac
     
+    export package_manager
     log "Platform validation passed: $os_release $os_version using $package_manager"
 }
 
@@ -393,7 +393,7 @@ setup_nvidia_gpu_support() {
     
     # Verify EESSI repository is accessible
     local eessi_version="2023.06"
-    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/eessi_environment_variables"
+    local eessi_init_script="/cvmfs/software.eessi.io/versions/$eessi_version/init/bash"
     local nvidia_link_script="/cvmfs/software.eessi.io/versions/$eessi_version/scripts/gpu_support/nvidia/link_nvidia_host_libraries.sh"
 
     # Wait for CVMFS to be ready and check EESSI access
@@ -435,29 +435,19 @@ setup_nvidia_gpu_support() {
     
     # Run EESSI setup directly
     log "Loading EESSI environment"
-    export EESSI_COMPAT_LAYER_DIR=/cvmfs/software.eessi.io/versions/2023.06/compat/linux/$(uname -m)
-    set +u # to avoid unbound variable error
-    source "$eessi_init_script" # 2>&1 | tee -a "$LOG_FILE"
-    local source_exit_code=${PIPESTATUS[0]}
-    
-    if [ $source_exit_code -ne 0 ]; then
+    if ! source "$eessi_init_script"; then
         log "WARNING: Failed to load EESSI environment"
         log "You may need to run this manually after reboot:"
         log "  source $eessi_init_script"
         log "  $nvidia_link_script"
         return 1
     fi
-    set -u
+
     log "EESSI environment loaded successfully"
-    log "EESSI environment variables:"
-    printenv | grep EESSI | tee -a "$LOG_FILE"
     log "Running NVIDIA host libraries linking script"
 
     # Run the NVIDIA linking script
-    "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"
-    local nvidia_exit_code=${PIPESTATUS[0]}
-    
-    if [ $nvidia_exit_code -eq 0 ]; then
+    if "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"; then
         log "NVIDIA host libraries linking completed successfully"
         log "GPU applications should now work with EESSI"
         
