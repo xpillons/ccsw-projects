@@ -1,0 +1,2 @@
+export FOO='foo'
+export FOO_CPU_FAMILY=$(uname -u)
