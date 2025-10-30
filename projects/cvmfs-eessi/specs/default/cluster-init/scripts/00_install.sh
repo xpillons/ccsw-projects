@@ -435,6 +435,7 @@ setup_nvidia_gpu_support() {
     
     # Run EESSI setup directly
     log "Loading EESSI environment"
+    export EESSI_COMPAT_LAYER_DIR=/cvmfs/software.eessi.io/versions/2023.06/compat/linux/$(uname -m)
     if ! source "$eessi_init_script"; then
         log "WARNING: Failed to load EESSI environment"
         log "You may need to run this manually after reboot:"
