@@ -449,8 +449,10 @@ setup_nvidia_gpu_support() {
     fi
     set -u
     log "EESSI environment loaded successfully"
+    log "EESSI environment variables:"
+    printenv | grep EESSI | tee -a "$LOG_FILE"
     log "Running NVIDIA host libraries linking script"
-    
+
     # Run the NVIDIA linking script
     "$nvidia_link_script" 2>&1 | tee -a "$LOG_FILE"
     local nvidia_exit_code=${PIPESTATUS[0]}
