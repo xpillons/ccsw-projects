@@ -215,7 +215,7 @@ install_cvmfs_debian() {
     # Download and install CVMFS release package
     local cvmfs_release_deb="cvmfs-release-latest_all.deb"
     log "Downloading CVMFS release package"
-    wget -q "https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/$cvmfs_release_deb" || error_exit "Failed to download CVMFS release package"
+    wget --no-check-certificate -q "https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/$cvmfs_release_deb" || error_exit "Failed to download CVMFS release package"
     
     log "Installing CVMFS release package"
     dpkg -i "$cvmfs_release_deb" || error_exit "Failed to install CVMFS release package"
