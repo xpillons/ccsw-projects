@@ -213,27 +213,50 @@ install_cvmfs_debian() {
     cd "$temp_dir" || error_exit "Failed to create temporary directory"
     
     # Download and install CVMFS release package
-    local cvmfs_release_deb="cvmfs-release-latest_all.deb"
     log "Downloading CVMFS release package"
-    wget -q "https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/$cvmfs_release_deb" || error_exit "Failed to download CVMFS release package"
+    local cvmfs_release_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb"
+    
+    # Try downloading with better error handling and fallback
+    if ! wget --timeout=30 --tries=3 -q "$cvmfs_release_url"; then
+        log "Primary download failed, trying alternative method..."
+        # Alternative: use curl as fallback
+        if ! curl -L -f -s -o "cvmfs-release-latest_all.deb" "$cvmfs_release_url"; then
+            error_exit "Failed to download CVMFS release package from $cvmfs_release_url"
+        fi
+    fi
     
     log "Installing CVMFS release package"
-    dpkg -i "$cvmfs_release_deb" || error_exit "Failed to install CVMFS release package"
+    if ! dpkg -i cvmfs-release-latest_all.deb; then
+        # Handle dependency issues
+        log "Fixing potential dependency issues..."
+        apt-get install -f -y || error_exit "Failed to fix dependencies for CVMFS release package"
+    fi
     
-    # Download and install EESSI configuration
-    local eessi_config_deb="cvmfs-config-eessi_latest_all.deb"
-    log "Downloading EESSI configuration"
-    wget -q "https://github.com/EESSI/filesystem-layer/releases/download/latest/$eessi_config_deb" || error_exit "Failed to download EESSI configuration"
-    
-    log "Installing EESSI configuration"
-    dpkg -i "$eessi_config_deb" || error_exit "Failed to install EESSI configuration"
-    
-    # Update package cache and install CVMFS
+    # Update package cache after installing release package
     log "Updating package cache"
-    apt update || error_exit "Failed to update package cache"
+    apt update || error_exit "Failed to update package cache after CVMFS release"
     
+    # Install CVMFS first, then EESSI config
     log "Installing CVMFS package"
     apt install -y cvmfs || error_exit "Failed to install CVMFS"
+    
+    # Download and install EESSI configuration
+    log "Downloading EESSI configuration"
+    local eessi_config_url="https://github.com/EESSI/filesystem-layer/releases/latest/download/cvmfs-config-eessi_latest_all.deb"
+    
+    if ! wget --timeout=30 --tries=3 -q "$eessi_config_url"; then
+        log "EESSI config download failed, trying alternative method..."
+        if ! curl -L -f -s -o "cvmfs-config-eessi_latest_all.deb" "$eessi_config_url"; then
+            log "WARNING: Failed to download EESSI configuration from $eessi_config_url"
+            log "CVMFS installed successfully, but EESSI configuration will need to be installed manually"
+        else
+            log "Installing EESSI configuration"
+            dpkg -i cvmfs-config-eessi_latest_all.deb || log "WARNING: Failed to install EESSI configuration package"
+        fi
+    else
+        log "Installing EESSI configuration"
+        dpkg -i cvmfs-config-eessi_latest_all.deb || log "WARNING: Failed to install EESSI configuration package"
+    fi
     
     # Cleanup
     cd /
