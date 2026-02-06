@@ -1,0 +1,9 @@
+/var/log/capacity_check.log {
+    size 100M
+    rotate 5
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
