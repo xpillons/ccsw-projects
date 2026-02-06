@@ -84,29 +84,44 @@ function get_partition_targets(partition_name)
 end
 
 --[[
-    Check if a partition is marked as INACTIVE in the state file.
+    Read and parse the partition state file.
     The state file is maintained by capacity_check.sh and tracks partitions
     that are INACTIVE due to capacity failures.
-    Returns true if partition is INACTIVE, false otherwise.
+    Returns the file content as a string, or nil if the file doesn't exist or is empty.
+    This should be called once per job submission to avoid repeated I/O.
 --]]
-function is_partition_inactive(partition_name)
+function read_partition_state()
     local file = io.open(PARTITION_STATE_FILE, "r")
     if file == nil then
         -- State file doesn't exist, assume all partitions are UP
-        return false
+        return nil
     end
     
     local content = file:read("*a")
     file:close()
     
     if content == nil or content == "" then
+        return nil
+    end
+    
+    return content
+end
+
+--[[
+    Check if a partition is marked as INACTIVE in the cached state content.
+    Takes the pre-read state file content to avoid repeated I/O operations.
+    Returns true if partition is INACTIVE, false otherwise.
+--]]
+function is_partition_inactive(partition_name, state_content)
+    if state_content == nil then
+        -- No state content, assume all partitions are UP
         return false
     end
     
     -- Simple pattern matching to check if partition is in the state file
     -- Looking for: "partition_name": {"state": "INACTIVE"
     local pattern = '"' .. partition_name .. '":%s*{[^}]*"state":%s*"INACTIVE"'
-    if string.match(content, pattern) then
+    if string.match(state_content, pattern) then
         slurm.log_debug("Partition '%s' is marked INACTIVE in state file", partition_name)
         return true
     end
@@ -116,13 +131,13 @@ end
 
 --[[
     Filter target partitions to only include those that are UP (not INACTIVE).
-    Uses the state file maintained by capacity_check.sh.
+    Uses the pre-read state content to avoid repeated I/O operations.
     Returns a table of active partitions.
 --]]
-function get_active_partitions(target_partitions)
+function get_active_partitions(target_partitions, state_content)
     local active = {}
     for _, partition in ipairs(target_partitions) do
-        if not is_partition_inactive(partition) then
+        if not is_partition_inactive(partition, state_content) then
             table.insert(active, partition)
         else
             slurm.log_info("Partition '%s' is INACTIVE (capacity issue), skipping", partition)
@@ -270,8 +285,12 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
         return slurm.SUCCESS
     end
     
+    -- Read the partition state file once for this job submission
+    -- This avoids repeated I/O operations when checking multiple partitions
+    local state_content = read_partition_state()
+    
     -- Filter to only active partitions (not marked INACTIVE in state file)
-    local active_partitions = get_active_partitions(target_partitions)
+    local active_partitions = get_active_partitions(target_partitions, state_content)
     
     -- If no active partitions, keep original partition
     if #active_partitions == 0 then
