@@ -84,11 +84,12 @@ function get_partition_targets(partition_name)
 end
 
 --[[
-    Read and parse the partition state file.
+    Read the partition state file.
     The state file is maintained by capacity_check.sh and tracks partitions
     that are INACTIVE due to capacity failures.
     Returns the file content as a string, or nil if the file doesn't exist or is empty.
     This should be called once per job submission to avoid repeated I/O.
+    The content is then passed to is_partition_inactive() for pattern matching.
 --]]
 function read_partition_state()
     local file = io.open(PARTITION_STATE_FILE, "r")
