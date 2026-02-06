@@ -30,17 +30,17 @@ This script monitors Azure capacity and automatically:
 
 The script supports two pluggable methods for retrieving capacity status:
 
-**1. azslurm buckets (default):**
-```bash
-azslurm buckets --output-columns nodearray,vm_size,last_capacity_failure --output-format json
-```
-
-**2. CycleCloud REST API:**
+**1. CycleCloud REST API (default):**
 - Uses credentials from `/opt/azurehpc/slurm/autoscale.json`
 - Queries the cluster status endpoint directly
 - Converts `lastCapacityFailure` of `-1.0` to `null` (no failure)
 
-To switch methods, change the function call in `main()` from `get_capacity_status` to `get_capacity_status_rest`.
+**2. azslurm buckets:**
+```bash
+azslurm buckets --output-columns nodearray,vm_size,last_capacity_failure --output-format json
+```
+
+To switch methods, change the function call in `main()` from `get_capacity_status_rest` to `get_capacity_status`.
 
 ### Partition State Management
 - If a partition has a capacity failure, set its state to INACTIVE
