@@ -8,12 +8,12 @@
 
     Installation:
     1. Copy this file to /etc/slurm/job_submit.lua
-    2. Copy partition_config.json to /etc/slurm/partition_config.json
+    2. Copy partition_config.conf to /etc/slurm/partition_config.conf
     3. Add to slurm.conf: JobSubmitPlugins=lua
     4. Restart slurmctld: systemctl restart slurmctld
 
     Configuration:
-    - Edit /etc/slurm/partition_config.json to define partition mappings
+    - Edit /etc/slurm/partition_config.conf to define partition mappings
 --]]
 
 -- Path to external partition configuration file (shared with capacity_check.sh)
