@@ -71,7 +71,7 @@ create_partition_config() {
     local config_sample="$SLURM_CONFIG_DIR/partition_config.conf.sample"
     local config_source="$SCRIPT_DIR/../files/partition_config.conf"
     
-    # If a config file is provided, install it as .sample (always update the sample)
+    # If a config file is provided, install it as .sample (update the sample with shipped config)
     if [ -f "$config_source" ]; then
         cp "$config_source" "$config_sample"
         chmod 644 "$config_sample"
