@@ -73,10 +73,15 @@ init_state_file() {
     
     if [[ ! -d "$state_dir" ]]; then
         mkdir -p "$state_dir"
+        chmod 755 "$state_dir"
+        chown slurm:slurm "$state_dir" 2>/dev/null || true
+        log "Created state directory: $state_dir"
     fi
     
     if [[ ! -f "$STATE_FILE" ]]; then
         echo '{"partitions":{}}' > "$STATE_FILE"
+        chmod 644 "$STATE_FILE"
+        chown slurm:slurm "$STATE_FILE" 2>/dev/null || true
         log "Initialized state file: $STATE_FILE"
     fi
 }
