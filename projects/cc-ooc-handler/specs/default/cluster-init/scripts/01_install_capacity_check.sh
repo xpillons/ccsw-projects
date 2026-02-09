@@ -79,8 +79,6 @@ install_systemd_service() {
 [Unit]
 Description=CycleCloud Capacity Check for Slurm
 After=network.target slurmctld.service
-Requires=slurmctld.service
-BindsTo=slurmctld.service
 
 [Service]
 Type=oneshot
