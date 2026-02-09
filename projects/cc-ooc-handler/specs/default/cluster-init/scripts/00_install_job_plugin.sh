@@ -68,23 +68,31 @@ create_partition_config() {
     log "Setting up partition configuration..."
     
     local config_dest="$SLURM_CONFIG_DIR/partition_config.conf"
+    local config_sample="$SLURM_CONFIG_DIR/partition_config.conf.sample"
     local config_source="$SCRIPT_DIR/../files/partition_config.conf"
     
-    # If a config file is provided, use it
+    # If a config file is provided, install it as .sample (update the sample with shipped config)
     if [ -f "$config_source" ]; then
-        cp "$config_source" "$config_dest"
-        chmod 644 "$config_dest"
-        log "Installed partition config from $config_source to $config_dest"
-        return 0
+        cp "$config_source" "$config_sample"
+        chmod 644 "$config_sample"
+        log "Installed partition config sample from $config_source to $config_sample"
     fi
     
-    # If config already exists, don't overwrite
+    # If live config already exists, don't overwrite (preserves operator edits)
     if [ -f "$config_dest" ]; then
-        log "Partition configuration already exists at $config_dest"
+        log "Partition configuration already exists at $config_dest (not overwriting)"
         return 0
     fi
     
-    # Create sample configuration
+    # Create live config from sample if available, otherwise create default
+    if [ -f "$config_sample" ]; then
+        cp "$config_sample" "$config_dest"
+        chmod 644 "$config_dest"
+        log "Initialized partition config from sample: $config_dest"
+        return 0
+    fi
+    
+    # Create default configuration
     cat > "$config_dest" << 'EOF'
 # Partition Configuration for Load-Balanced Job Submission
 # Format: partition: fallback1,fallback2,fallback3

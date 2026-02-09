@@ -46,7 +46,7 @@ The plugin is automatically installed by CycleCloud cluster-init. Manual install
 
 ```bash
 sudo /opt/cycle/jetpack/system/embedded/bin/bash \
-    /opt/cycle/jetpack/specs/default/cluster-init/scripts/00_install.sh
+    /opt/cycle/jetpack/specs/default/cluster-init/scripts/00_install_job_plugin.sh
 ```
 
 ## Files Installed

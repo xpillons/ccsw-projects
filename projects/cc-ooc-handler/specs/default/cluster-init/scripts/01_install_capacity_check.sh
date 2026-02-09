@@ -132,6 +132,11 @@ main() {
     log "Starting Capacity Check Service Installation"
     log "=========================================="
     
+    # Ensure running as root
+    if [ "$(id -u)" -ne 0 ]; then
+        error_exit "This script must be run as root"
+    fi
+    
     load_configuration
     install_script
     install_logrotate
