@@ -1,6 +1,6 @@
 #!/bin/bash
-# Capacity Check Service Installation Script
-# This script installs and configures the capacity_check.sh as a systemd service
+# Capacity Check Installation Script
+# This script installs and configures the capacity_check.sh as a cron job
 # to monitor CycleCloud cluster capacity and handle out-of-capacity scenarios
 
 set -euo pipefail
@@ -8,7 +8,6 @@ set -euo pipefail
 # Global variables
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LOG_FILE="/var/log/capacity_check.log"
-SERVICE_NAME="capacity-check"
 INSTALL_DIR="/opt/azurehpc/slurm"
 
 # Source common functions
@@ -21,8 +20,8 @@ check_scheduler_node
 load_configuration() {
     load_base_configuration "$SCRIPT_DIR"
     
-    # Capacity check service configuration
-    CAPACITY_CHECK_INTERVAL="${CAPACITY_CHECK_INTERVAL:-300}"
+    # Capacity check configuration
+    CAPACITY_CHECK_CRON="${CAPACITY_CHECK_CRON:-*/6 * * * *}"
     INSTALL_DIR="${INSTALL_DIR:-/opt/azurehpc/slurm}"
     
     # Verify INSTALL_DIR exists
@@ -31,7 +30,7 @@ load_configuration() {
     fi
     
     log "Configuration loaded:"
-    log "  Capacity check interval: ${CAPACITY_CHECK_INTERVAL}s"
+    log "  Cron schedule: ${CAPACITY_CHECK_CRON}"
     log "  Install directory: $INSTALL_DIR"
 }
 
@@ -67,63 +66,19 @@ install_logrotate() {
     fi
 }
 
-# Create and install the systemd service unit
-install_systemd_service() {
-    log "Installing systemd service..."
+# Install the cron job
+install_cron() {
+    log "Installing cron job..."
     
-    local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
-    local timer_file="/etc/systemd/system/${SERVICE_NAME}.timer"
+    local cron_file="/etc/cron.d/capacity-check"
     
-    # Create the service unit (oneshot, triggered by timer)
-    cat > "$service_file" << EOF
-[Unit]
-Description=CycleCloud Capacity Check for Slurm
-After=network.target slurmctld.service
-
-[Service]
-Type=oneshot
-ExecStart=$INSTALL_DIR/capacity_check.sh
-StandardOutput=append:/var/log/capacity_check.log
-StandardError=append:/var/log/capacity_check.log
-User=root
-
-[Install]
-WantedBy=multi-user.target
+    cat > "$cron_file" << EOF
+# CycleCloud Capacity Check for Slurm
+# Runs every 6 minutes to monitor partition capacity
+${CAPACITY_CHECK_CRON} root ${INSTALL_DIR}/capacity_check.sh >> /var/log/capacity_check.log 2>&1
 EOF
-    chmod 644 "$service_file"
-    log "Created service unit: $service_file"
-    
-    # Create the timer unit
-    cat > "$timer_file" << EOF
-[Unit]
-Description=Run CycleCloud Capacity Check periodically
-After=slurmctld.service
-Requires=slurmctld.service
-
-[Timer]
-OnBootSec=60
-OnUnitActiveSec=${CAPACITY_CHECK_INTERVAL}
-AccuracySec=10
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-    chmod 644 "$timer_file"
-    log "Created timer unit: $timer_file"
-}
-
-# Enable and start the systemd timer
-enable_service() {
-    log "Enabling and starting capacity check timer..."
-    
-    systemctl daemon-reload
-    systemctl enable "${SERVICE_NAME}.timer"
-    systemctl start "${SERVICE_NAME}.timer"
-    
-    log "Timer enabled and started"
-    log "Timer status:"
-    systemctl status "${SERVICE_NAME}.timer" --no-pager || true
+    chmod 644 "$cron_file"
+    log "Created cron job: $cron_file"
 }
 
 # Main installation function
@@ -140,17 +95,15 @@ main() {
     load_configuration
     install_script
     install_logrotate
-    install_systemd_service
-    enable_service
+    install_cron
     
     log "=========================================="
-    log "Capacity Check Service Installation Complete"
+    log "Capacity Check Installation Complete"
     log "=========================================="
     log ""
-    log "The capacity check runs every ${CAPACITY_CHECK_INTERVAL} seconds."
-    log "To check status: systemctl status ${SERVICE_NAME}.timer"
+    log "The capacity check runs on schedule: ${CAPACITY_CHECK_CRON}"
     log "To view logs: tail -f /var/log/capacity_check.log"
-    log "To run manually: systemctl start ${SERVICE_NAME}.service"
+    log "To run manually: ${INSTALL_DIR}/capacity_check.sh"
 }
 
 main "$@"
