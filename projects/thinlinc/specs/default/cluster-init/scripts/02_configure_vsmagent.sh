@@ -1,5 +1,5 @@
 #!/bin/bash
-
+exit 0
 # Fetch the connection mode 
 connection_mode=$(jetpack config thinlinc.connection_mode private_ip)
 
