@@ -236,7 +236,7 @@ enable_web_access() {
     install_pam_tlpasswd
     install_xsession
     configure_web_port
-    configure_proxy_settings
+    #configure_proxy_settings
     restart_tlwebaccess_service
     
     log "ThinLinc Web Access enabled and configured successfully"
