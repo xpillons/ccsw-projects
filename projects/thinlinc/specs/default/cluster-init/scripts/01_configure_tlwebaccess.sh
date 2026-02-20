@@ -162,15 +162,13 @@ disable_tlwebaccess_service() {
     log "ThinLinc Web Access service disabled successfully"
 }
 
-# Install and configure PAM ThinLinc password module
+# Install PAM ThinLinc password module
 install_pam_tlpasswd() {
     log "Installing PAM ThinLinc password module"
     
     local pam_url="https://github.com/cendio/ood-thinlinc/releases/download/v1.0/pam_tlpasswd.so"
     local pam_dir="/lib64/security"
     local pam_dest="$pam_dir/pam_tlpasswd.so"
-    local sshd_pam="/etc/pam.d/sshd"
-    local pam_line="auth\t   [success=done ignore=ignore default=die] pam_tlpasswd.so"
     
     # Download PAM module
     log "Downloading pam_tlpasswd.so from $pam_url"
@@ -184,6 +182,14 @@ install_pam_tlpasswd() {
     install "$tmp_file" "$pam_dest" || error_exit "Failed to install pam_tlpasswd.so"
     rm -f "$tmp_file"
     log "PAM module installed to $pam_dest"
+}
+
+# Configure /etc/pam.d/sshd for ThinLinc password authentication
+configure_sshd_pam() {
+    log "Configuring PAM sshd for ThinLinc"
+    
+    local sshd_pam="/etc/pam.d/sshd"
+    local pam_line="auth\t   [success=done ignore=ignore default=die] pam_tlpasswd.so"
     
     # Configure PAM for sshd
     if [ ! -f "$sshd_pam" ]; then
@@ -209,7 +215,7 @@ install_pam_tlpasswd() {
     mv "$temp_file" "$sshd_pam" || error_exit "Failed to update $sshd_pam"
     chmod 644 "$sshd_pam" || error_exit "Failed to set $sshd_pam permissions"
     
-    log "PAM ThinLinc password module configured successfully"
+    log "PAM sshd configured successfully"
 }
 
 # Install custom xsession file
@@ -233,7 +239,7 @@ install_xsession() {
 enable_web_access() {
     log "Enabling ThinLinc Web Access"
     
-    install_pam_tlpasswd
+    configure_sshd_pam
     install_xsession
     configure_web_port
     #configure_proxy_settings
