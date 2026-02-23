@@ -76,40 +76,47 @@ configure_web_port() {
 }
 
 # Configure proxy settings for reverse proxy compatibility
+# After successful authentication, Thinlinc's main.py generates an absolute
+# redirect URL (https://<host>:<port>/agent) which bypasses the OOD reverse
+# proxy. This function replaces that absolute redirect with a relative path
+# (../../../agent) that works correctly both through the proxy and directly.
+#
+# The relative path resolves as follows:
+#   Through proxy: /secure-rnode/<host>/<port>/connect/<agent>/agent
+#     ../../../agent -> /secure-rnode/<host>/<port>/agent (proxied correctly)
+#   Direct access: /connect/<agent>/agent
+#     ../../../agent -> /agent (works as before)
 configure_proxy_settings() {
     log "Configuring proxy settings for reverse proxy compatibility"
-    
-    local hostname_var
-    hostname_var=$(hostname)
-    local proxy_base_url="secure-rnode\/${hostname_var}\/${thinlinc_web_port}\/"
-    
-    log "Using proxy base URL: $proxy_base_url"
-    
-    # Backup template files before modification
-    backup_template_files
-    
-    # Update main.tmpl
-    log "Updating main.tmpl template"
-    if ! sed -i -e "s/action=\"\/\"/action=\"\/${proxy_base_url}\"/" "$TL_HTML_TEMPLATES/main.tmpl"; then
-        error_exit "Failed to update action URL in main.tmpl"
+
+    local main_py="$TL_ROOT/modules/thinlinc/tlwebaccess/main.py"
+
+    if [ ! -f "$main_py" ]; then
+        error_exit "Thinlinc main.py not found: $main_py"
     fi
-    
-    if ! sed -i -e "s/\$qh(\$targetserver)/\/${proxy_base_url}/" "$TL_HTML_TEMPLATES/main.tmpl"; then
-        error_exit "Failed to update target server URL in main.tmpl"
+
+    # Backup main.py before modification
+    cp "$main_py" "${main_py}.backup.$(date +%Y%m%d_%H%M%S)" || \
+        error_exit "Failed to backup main.py"
+
+    # Replace the absolute redirect URL with a relative path
+    # Original: "https://%s:%s/agent" % ( OO0000 , I1i )
+    # Fixed:    "../../agent"
+    #
+    # URL resolution from browser at:
+    #   /secure-rnode/<host>/<port>/connect/<agent>/agent
+    # Base dir: /secure-rnode/<host>/<port>/connect/<agent>/
+    #   ../../agent -> /secure-rnode/<host>/<port>/agent (proxied correctly)
+    log "Updating main.py to use relative redirect path"
+    if ! sed -i 's|"https://%s:%s/agent" % ( OO0000 , I1i )|"../../agent"|' "$main_py"; then
+        error_exit "Failed to update redirect URL in main.py"
     fi
-    
-    # Update vnc.tmpl
-    log "Updating vnc.tmpl template"
-    if ! sed -i -e "s/href=\"\/\"/href=\"\/${proxy_base_url}\"/" "$TL_HTML_TEMPLATES/vnc.tmpl"; then
-        error_exit "Failed to update href URL in vnc.tmpl"
+
+    # Verify the change was applied
+    if grep -q 'https://%s:%s/agent' "$main_py"; then
+        error_exit "Failed to verify redirect URL change in main.py"
     fi
-    
-	# Replace websocket with "secure-rnode/$(hostname)/port/websocket"
-    log "Updating websocket proxy in agent.py"
-    if ! sed -i -e "s/websocket\//\/${proxy_base_url}websocket\//" "$TL_ROOT/modules/thinlinc/tlwebaccess/agent.py"; then
-        error_exit "Failed to update websocket URL in agent.py"
-    fi
-	
+
     log "Proxy settings configured successfully"
 }
 
@@ -242,7 +249,7 @@ enable_web_access() {
     configure_sshd_pam
     install_xsession
     configure_web_port
-    #configure_proxy_settings
+    configure_proxy_settings
     restart_tlwebaccess_service
     
     log "ThinLinc Web Access enabled and configured successfully"
