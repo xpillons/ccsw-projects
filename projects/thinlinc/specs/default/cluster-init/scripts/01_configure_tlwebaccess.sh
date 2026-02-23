@@ -166,19 +166,21 @@ configure_sshd_pam() {
     log "PAM sshd configured successfully"
 }
 
-# Install custom xsession file
+# Install custom xsession file from ood-thinlinc repository
 install_xsession() {
     log "Installing custom xsession file"
     
-    local xsession_source="$SCRIPT_DIR/../files/xsession"
+    local xsession_url="https://raw.githubusercontent.com/cendio/ood-thinlinc/main/prequisites/xsession"
     local xsession_dest="$TL_ROOT/etc/xsession"
+    local tmp_file="/tmp/xsession.$$"
     
-    if [ ! -f "$xsession_source" ]; then
-        error_exit "xsession source file not found: $xsession_source"
+    log "Downloading xsession from $xsession_url"
+    if ! wget -q -O "$tmp_file" "$xsession_url"; then
+        error_exit "Failed to download xsession"
     fi
     
-    cp "$xsession_source" "$xsession_dest" || error_exit "Failed to copy xsession to $xsession_dest"
-    chmod 755 "$xsession_dest" || error_exit "Failed to set xsession permissions"
+    install -m 755 "$tmp_file" "$xsession_dest" || error_exit "Failed to install xsession to $xsession_dest"
+    rm -f "$tmp_file"
     
     log "Custom xsession file installed successfully"
 }
