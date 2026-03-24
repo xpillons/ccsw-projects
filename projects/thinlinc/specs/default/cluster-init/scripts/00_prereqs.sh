@@ -62,6 +62,34 @@ configure_firewalld() {
     log "firewalld configured successfully"
 }
 
+# Disable SELinux if enabled
+disable_selinux() {
+    if ! command -v getenforce &>/dev/null; then
+        log "SELinux not available on this system, skipping"
+        return 0
+    fi
+
+    local current_status
+    current_status=$(getenforce)
+    if [[ "$current_status" == "Disabled" ]]; then
+        log "SELinux is already disabled"
+        return 0
+    fi
+
+    log "SELinux is $current_status, disabling..."
+
+    # Disable at runtime
+    setenforce 0 || log "WARNING: Failed to set SELinux to permissive (may already be permissive)"
+
+    # Disable persistently
+    if [ -f /etc/selinux/config ]; then
+        sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config || error_exit "Failed to update /etc/selinux/config"
+        log "SELinux disabled persistently in /etc/selinux/config"
+    fi
+
+    log "SELinux disabled successfully"
+}
+
 # Main execution function
 main() {
     initialize_logging
@@ -75,6 +103,7 @@ main() {
 
     install_nslookup
     configure_firewalld
+    disable_selinux
 
     log "Prerequisites installation completed successfully"
 }
