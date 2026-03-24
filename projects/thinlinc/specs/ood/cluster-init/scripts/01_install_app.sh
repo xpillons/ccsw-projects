@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/../../default/cluster-init/files/common.sh"
+source "$SCRIPT_DIR/../../default/files/common.sh"
 
 OOD_APPS_DIR="/var/www/ood/apps/sys"
 APP_NAME="ood-thinlinc"
