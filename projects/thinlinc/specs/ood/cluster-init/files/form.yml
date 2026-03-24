@@ -1,0 +1,15 @@
+---
+form:
+  - global_ccw_clusters
+  - global_ccw_queues
+  - bc_num_hours
+  - num_gpus
+attributes:
+
+  num_gpus:
+    widget: "number_field"
+    label: "Number of GPUs"
+    value: 0
+    min: 0
+    max: 8
+    step: 1
