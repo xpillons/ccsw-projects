@@ -39,6 +39,9 @@ configure_firewalld() {
         return 0
     fi
 
+    systemctl stop firewalld || log "WARNING: Failed to stop firewalld (may not be running)"
+    systemctl disable firewalld || log "WARNING: Failed to disable firewalld (may not be running)"
+    
     # Only proceed if firewalld is active
     if ! systemctl is-active --quiet firewalld; then
         log "firewalld is not running, skipping firewall configuration"
