@@ -2,32 +2,13 @@
 
 set -euo pipefail
 
-# Global variables
-SCRIPT_NAME="$(basename "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/../files/common.sh"
+
+# Global variables
 TL_ROOT="/opt/thinlinc"
-LOG_FILE="/var/log/thinlinc-webaccess-config.log"
 enable_web="True"
 thinlinc_web_port=443
-
-# Logging function to prefix messages with timestamp
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SCRIPT_NAME] $*" | tee -a "$LOG_FILE"
-}
-
-# Error handler function
-error_exit() {
-    log "ERROR: $1"
-    exit 1
-}
-
-# Initialize logging
-initialize_logging() {
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
-    chmod 644 "$LOG_FILE"
-    log "Starting ThinLinc Web Access configuration"
-}
 
 # Check if ThinLinc is installed and accessible
 validate_thinlinc_installation() {
@@ -185,44 +166,10 @@ install_xsession() {
     log "Custom xsession file installed successfully"
 }
 
-# Configure firewalld ports on AlmaLinux/RHEL if firewalld is running
-configure_firewalld() {
-    # Only proceed on RHEL-based systems
-    local os_id
-    os_id=$(source /etc/os-release && echo "$ID")
-    if [[ "$os_id" != "almalinux" && "$os_id" != "rhel" && "$os_id" != "centos" && "$os_id" != "rocky" ]]; then
-        log "Not a RHEL-based system ($os_id), skipping firewalld configuration"
-        return 0
-    fi
-
-    # Only proceed if firewalld is active
-    if ! systemctl is-active --quiet firewalld; then
-        log "firewalld is not running, skipping firewall configuration"
-        return 0
-    fi
-
-    log "Configuring firewalld ports for Slurm, HTTPS, and CycleCloud"
-
-    # HTTPS
-    firewall-cmd --permanent --add-service=https || error_exit "Failed to add HTTPS service to firewalld"
-
-    # Slurm ports: slurmctld (6817), slurmd (6818), slurmdbd (6819)
-    firewall-cmd --permanent --add-port=6817-6819/tcp || error_exit "Failed to add Slurm ports to firewalld"
-
-    # CycleCloud (9443)
-    firewall-cmd --permanent --add-port=9443/tcp || error_exit "Failed to add CycleCloud port to firewalld"
-
-    # Reload to apply changes
-    firewall-cmd --reload || error_exit "Failed to reload firewalld"
-
-    log "firewalld configured successfully"
-}
-
 # Enable and configure ThinLinc Web Access
 enable_web_access() {
     log "Enabling ThinLinc Web Access"
     
-    configure_firewalld
     configure_sshd_pam
     install_xsession
     configure_web_port
@@ -262,15 +209,13 @@ show_configuration_summary() {
 # Main execution function
 main() {
     initialize_logging
+    log "Starting ThinLinc Web Access configuration"
     
     log "Script: $0"
     log "User: $(whoami)"
     log "Date: $(date)"
     
-    # Check if running as root
-    if [ "$EUID" -ne 0 ]; then
-        error_exit "This script must be run as root"
-    fi
+    check_root
     
     validate_thinlinc_installation
     
