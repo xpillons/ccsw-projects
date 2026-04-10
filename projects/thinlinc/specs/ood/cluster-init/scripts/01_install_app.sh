@@ -62,7 +62,7 @@ copy_config_files() {
     log "Configuration files copied successfully"
 }
 
-# Configure custom_location_directives in the OOD portal configuration file /etc/ood/config/ood-portal.yml
+# Configure custom_location_directives in the OOD portal configuration file /etc/ood/config/ood_portal.yml
 #
 # custom_location_directives:
 #   - '<If "%{REQUEST_URI} =~ m|^/secure-rnode/([^/]+)/(\d+)/connect/\1|">'
@@ -71,7 +71,7 @@ copy_config_files() {
 #   - '</If>'
 
 configure_location_directives() {
-    local config_file="/etc/ood/config/ood-portal.yml"
+    local config_file="/etc/ood/config/ood_portal.yml"
     local marker="AddOutputFilterByType SUBSTITUTE"
 
     if [ ! -f "$config_file" ]; then
