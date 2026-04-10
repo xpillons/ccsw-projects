@@ -74,6 +74,8 @@ configure_location_directives() {
     local config_file="/etc/ood/config/ood_portal.yml"
     local marker="AddOutputFilterByType SUBSTITUTE"
 
+    log "Configuring custom_location_directives in $config_file"
+
     if [ ! -f "$config_file" ]; then
         error_exit "OOD portal configuration file not found: $config_file"
     fi
@@ -86,13 +88,14 @@ configure_location_directives() {
 
     # Remove commented custom_location_directives block if present
     if grep -qP '^#\s*custom_location_directives:' "$config_file"; then
-        log "Removing commented custom_location_directives from $config_file"
+        log "Found commented custom_location_directives block, removing it"
         sed -i '/^#\s*custom_location_directives:/,/^[^#]/{/^#/d}' "$config_file"
+        log "Commented block removed"
     fi
 
     # Append the block if not already present
     if ! grep -qP '^custom_location_directives:' "$config_file"; then
-        log "Adding custom_location_directives to $config_file"
+        log "Appending custom_location_directives block to $config_file"
         cat >> "$config_file" <<'EOF'
 
 custom_location_directives:
@@ -101,10 +104,14 @@ custom_location_directives:
   - '  Substitute "s|https://([^/:]+):(\d+)/|/secure-rnode/$1/$2/|i"'
   - '</If>'
 EOF
+        log "custom_location_directives block appended"
+    else
+        log "custom_location_directives key already present in $config_file"
     fi
 
+    log "Running update_ood_portal to apply changes"
     /opt/ood/ood-portal-generator/sbin/update_ood_portal -f || error_exit "Failed to update OOD portal configuration with custom_location_directives"
-    log "custom_location_directives configured in $config_file"
+    log "custom_location_directives configured successfully in $config_file"
 }
 # Main execution function
 main() {
