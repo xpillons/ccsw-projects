@@ -84,14 +84,14 @@ configure_location_directives() {
         return 0
     fi
 
-    # Present but commented — uncomment the block
+    # Remove commented custom_location_directives block if present
     if grep -qP '^#\s*custom_location_directives:' "$config_file"; then
-        log "Uncommenting custom_location_directives in $config_file"
-        sed -i '/^#\s*custom_location_directives:/,/^[^#]/{
-            s/^#\s\{0,\}//
-        }' "$config_file"
-    # Not present at all — append the full block
-    elif ! grep -qP '^custom_location_directives:' "$config_file"; then
+        log "Removing commented custom_location_directives from $config_file"
+        sed -i '/^#\s*custom_location_directives:/,/^[^#]/{/^#/d}' "$config_file"
+    fi
+
+    # Append the block if not already present
+    if ! grep -qP '^custom_location_directives:' "$config_file"; then
         log "Adding custom_location_directives to $config_file"
         cat >> "$config_file" <<'EOF'
 
