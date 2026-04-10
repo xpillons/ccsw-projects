@@ -10,6 +10,21 @@ TL_ROOT="/opt/thinlinc"
 enable_web="True"
 thinlinc_web_port=443
 
+# Set hostname for vsmagent instead of private IP to ensure correct URL generation for reverse proxy access
+configure_vsmagent() {
+    log "Configuring vsmagent hostname to $HOSTNAME"
+
+    if ! /opt/thinlinc/bin/tl-config "/vsmagent/agent_hostname=$HOSTNAME"; then
+        error_exit "Failed to configure vsmagent agent_hostname"
+    fi
+
+    if ! systemctl restart vsmagent; then
+        error_exit "Failed to restart vsmagent service"
+    fi
+
+    log "vsmagent configured successfully"
+}
+
 # Check if ThinLinc is installed and accessible
 validate_thinlinc_installation() {
     log "Validating ThinLinc installation"
@@ -173,7 +188,8 @@ enable_web_access() {
     configure_sshd_pam
     install_xsession
     configure_web_port
-    configure_proxy_settings
+    configure_vsmagent
+#    configure_proxy_settings
     restart_tlwebaccess_service
     
     log "ThinLinc Web Access enabled and configured successfully"
