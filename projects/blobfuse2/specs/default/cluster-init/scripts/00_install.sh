@@ -65,6 +65,10 @@ load_configuration() {
     BLOBFUSE_LOG_FILE="${LOG_FILE:-/var/log/blobfuse2.log}"
     ENABLE_SYSTEMD_SERVICE="${ENABLE_SYSTEMD_SERVICE:-true}"
     DEBUG_LOGGING="${DEBUG_LOGGING:-false}"
+    # User-assigned managed identity selection (optional, only used with AUTH_METHOD=msi)
+    MSI_CLIENT_ID="${MSI_CLIENT_ID:-}"
+    MSI_RESOURCE_ID="${MSI_RESOURCE_ID:-}"
+    MSI_OBJECT_ID="${MSI_OBJECT_ID:-}"
     
     # Auto-detect cache directory if not specified
     if [ -z "${CACHE_DIR:-}" ]; then
@@ -263,6 +267,30 @@ EOF
         cat >> "$config_file" << EOF
   mode: msi
 EOF
+        # If the VM has multiple user-assigned managed identities, the identity to
+        # use must be specified explicitly. Without it, blobfuse2 fails with:
+        #   "Multiple user assigned identities exist, please specify the clientId /
+        #    resourceId of the identity in the token request"
+        # Preference order: client ID (appid) > resource ID (resid) > object ID (objid).
+        if [ -n "${MSI_CLIENT_ID:-}" ]; then
+            cat >> "$config_file" << EOF
+  appid: ${MSI_CLIENT_ID}
+EOF
+            log "MSI: using user-assigned identity by client ID: ${MSI_CLIENT_ID}"
+        elif [ -n "${MSI_RESOURCE_ID:-}" ]; then
+            cat >> "$config_file" << EOF
+  resid: ${MSI_RESOURCE_ID}
+EOF
+            log "MSI: using user-assigned identity by resource ID: ${MSI_RESOURCE_ID}"
+        elif [ -n "${MSI_OBJECT_ID:-}" ]; then
+            cat >> "$config_file" << EOF
+  objid: ${MSI_OBJECT_ID}
+EOF
+            log "MSI: using user-assigned identity by object ID: ${MSI_OBJECT_ID}"
+        else
+            log "MSI: no specific identity configured (using system-assigned or single user-assigned identity)"
+            log "MSI: if the VM has multiple user-assigned identities, set MSI_CLIENT_ID or MSI_RESOURCE_ID to avoid token errors"
+        fi
         if [ -n "${STORAGE_ACCOUNT_NAME:-}" ]; then
             cat >> "$config_file" << EOF
   account-name: ${STORAGE_ACCOUNT_NAME}

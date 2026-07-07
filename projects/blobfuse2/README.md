@@ -31,6 +31,9 @@ Configuration is managed through the `files/blobfuse2-config.env` file. Key sett
 | `STORAGE_CONTAINER_NAME` | (empty) | Blob container to mount |
 | `AUTH_METHOD` | `msi` | Authentication method: `msi` or `key` |
 | `STORAGE_ACCOUNT_KEY` | (empty) | Storage account key (only for `key` auth) |
+| `MSI_CLIENT_ID` | (empty) | Client ID of the user-assigned managed identity (required when the VM has multiple identities) |
+| `MSI_RESOURCE_ID` | (empty) | Resource ID of the user-assigned managed identity (alternative to `MSI_CLIENT_ID`) |
+| `MSI_OBJECT_ID` | (empty) | Object ID of the user-assigned managed identity (requires Azure CLI on the node) |
 
 ### Mount Settings
 
@@ -160,6 +163,7 @@ df -h /blobfuse
 2. **Mount Fails**: Check if the storage account and container names are correct
 3. **Cache Issues**: Verify the cache directory has sufficient space
 4. **FUSE Errors**: Ensure `user_allow_other` is in `/etc/fuse.conf`
+5. **Multiple User-Assigned Identities**: If you see *"Multiple user assigned identities exist, please specify the clientId / resourceId of the identity in the token request"*, set `MSI_CLIENT_ID` (or `MSI_RESOURCE_ID`) in `blobfuse2-config.env` to the identity that holds the Storage Blob Data role.
 
 ## 📖 References
 
