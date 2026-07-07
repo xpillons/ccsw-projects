@@ -371,8 +371,37 @@ EOF
     systemctl daemon-reload
     
     log "Systemd service created: $service_file"
-    log "To enable auto-mount on boot: systemctl enable blobfuse2"
-    log "To start mount now: systemctl start blobfuse2"
+
+    # Enable and start the service so the mount is active now and on every boot.
+    # Only do this when the storage account/container are configured; otherwise the
+    # mount would fail and, with Restart=on-failure, retry every 10s. In that case
+    # leave the unit installed but inactive for the operator to start later.
+    local can_start=true
+    local skip_reason=""
+    if [ -z "${STORAGE_ACCOUNT_NAME:-}" ] || [ -z "${STORAGE_CONTAINER_NAME:-}" ]; then
+        can_start=false
+        skip_reason="storage account name/container not configured"
+    elif [ "$AUTH_METHOD" = "key" ] && [ -z "${STORAGE_ACCOUNT_KEY:-}" ]; then
+        can_start=false
+        skip_reason="storage account key not configured for key authentication"
+    fi
+
+    if [ "$can_start" = true ]; then
+        systemctl enable blobfuse2 >/dev/null 2>&1 || log "WARNING: failed to enable blobfuse2 service"
+        if systemctl is-active --quiet blobfuse2; then
+            log "blobfuse2 service already active; leaving the existing mount in place"
+        else
+            log "Starting blobfuse2 service (mounting ${MOUNT_POINT})..."
+            if systemctl start blobfuse2; then
+                log "blobfuse2 service enabled and started; ${MOUNT_POINT} mounted"
+            else
+                log "WARNING: blobfuse2 failed to start; check 'journalctl -u blobfuse2' and '${BLOBFUSE_LOG_FILE}'"
+            fi
+        fi
+    else
+        log "blobfuse2 service installed but not enabled/started (${skip_reason})."
+        log "After setting the storage account/container in ${CONFIG_DIR}/config.yaml, run: systemctl enable --now blobfuse2"
+    fi
 }
 
 # Validate installation

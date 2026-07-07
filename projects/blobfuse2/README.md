@@ -70,7 +70,7 @@ The installation script (`scripts/00_install.sh`) performs the following steps:
 4. **Mount Point Setup**: Creates the mount point directory
 5. **Configuration**: Generates `/etc/blobfuse2/config.yaml`
 6. **FUSE Configuration**: Enables `user_allow_other` in `/etc/fuse.conf`
-7. **Systemd Service**: Creates systemd service for auto-mount (optional)
+7. **Systemd Service**: Creates the systemd service and, when the storage account/container are configured, enables and starts it for auto-mount (optional)
 8. **Validation**: Verifies installation and configuration
 
 ## 🚦 Usage
