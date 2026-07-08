@@ -42,6 +42,24 @@ Configuration is managed through the `files/blobfuse2-config.env` file. Key sett
 | `MOUNT_POINT` | `/blobfuse` | Where to mount the blob storage |
 | `ALLOW_OTHER` | `true` | Allow other users to access the mount |
 | `READ_ONLY` | `true` | Mount as read-only |
+| `MOUNT_UID` | (empty) | Numeric uid presented as owner of the whole mount (libfuse `uid`) |
+| `MOUNT_GID` | (empty) | Numeric gid presented as owner of the whole mount (libfuse `gid`) |
+
+> **⚠️ Ownership & permissions:** blobfuse2 does **not** implement `chown`, so
+> per-file/per-folder ownership cannot be changed on the mount — the call is a
+> silent no-op. Every object is presented with a single, mount-wide owner (root
+> by default, or `MOUNT_UID`/`MOUNT_GID` if set). `READ_ONLY` is unrelated; it only
+> adds the `ro` flag.
+>
+> Permission **bits** behave differently by account type: the mount root is always
+> `0777`; flat (block blob) objects have no stored mode so they use blobfuse2
+> defaults (`0777` when `ALLOW_OTHER=true`); ADLS Gen2 (hierarchical namespace)
+> objects store a POSIX mode per object (commonly `0755` for dirs) which blobfuse2
+> honors. `chmod` **is** supported and persists (e.g. `chmod -R 2775 /blobfuse/<dir>`).
+>
+> If you need true per-file/folder `uid`/`gid` preserved, blobfuse2 is not suitable
+> on **any** storage account type — use a POSIX filesystem instead: **Azure NetApp
+> Files** (NFS), **Azure Managed Lustre**, or an **Azure Files NFS v4.1** share.
 
 ### Cache Settings
 
@@ -164,6 +182,7 @@ df -h /blobfuse
 3. **Cache Issues**: Verify the cache directory has sufficient space
 4. **FUSE Errors**: Ensure `user_allow_other` is in `/etc/fuse.conf`
 5. **Multiple User-Assigned Identities**: If you see *"Multiple user assigned identities exist, please specify the clientId / resourceId of the identity in the token request"*, set `MSI_CLIENT_ID` (or `MSI_RESOURCE_ID`) in `blobfuse2-config.env` to the identity that holds the Storage Blob Data role.
+6. **Cannot change owner / folders are `0755`**: This is expected. blobfuse2 has no working `chown`, and per-object ownership is never surfaced (see *Ownership & permissions* above). Use `MOUNT_UID`/`MOUNT_GID` for a mount-wide owner and `chmod` for permission bits; for true per-file ownership use Azure NetApp Files, Azure Managed Lustre, or an Azure Files NFS v4.1 share.
 
 ## 📖 References
 

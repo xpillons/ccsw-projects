@@ -69,6 +69,10 @@ load_configuration() {
     MSI_CLIENT_ID="${MSI_CLIENT_ID:-}"
     MSI_RESOURCE_ID="${MSI_RESOURCE_ID:-}"
     MSI_OBJECT_ID="${MSI_OBJECT_ID:-}"
+    # Mount ownership (optional). blobfuse2 does not support per-file chown, so
+    # these present the whole mount as owned by the given numeric uid/gid.
+    MOUNT_UID="${MOUNT_UID:-}"
+    MOUNT_GID="${MOUNT_GID:-}"
     
     # Auto-detect cache directory if not specified
     if [ -z "${CACHE_DIR:-}" ]; then
@@ -225,6 +229,19 @@ create_config_file() {
     else
         readonly_config="read-only: false"
     fi
+
+    # Build optional mount ownership config (libfuse uid/gid). blobfuse2 has no
+    # working chown, so this is the only way to make the mount appear owned by a
+    # specific user/group instead of root. Emitted only when explicitly set.
+    local libfuse_owner_config=""
+    if [ -n "${MOUNT_UID:-}" ]; then
+        libfuse_owner_config+=$'\n'"  uid: ${MOUNT_UID}"
+        log "Mount ownership: uid ${MOUNT_UID}"
+    fi
+    if [ -n "${MOUNT_GID:-}" ]; then
+        libfuse_owner_config+=$'\n'"  gid: ${MOUNT_GID}"
+        log "Mount ownership: gid ${MOUNT_GID}"
+    fi
     
     # Create base config with file caching.
     # NOTE: allow-other and read-only are GLOBAL options and must live at the top
@@ -252,7 +269,7 @@ components:
 libfuse:
   attribute-expiration-sec: ${CACHE_TIMEOUT_SEC}
   entry-expiration-sec: ${CACHE_TIMEOUT_SEC}
-  negative-entry-expiration-sec: ${CACHE_TIMEOUT_SEC}
+  negative-entry-expiration-sec: ${CACHE_TIMEOUT_SEC}${libfuse_owner_config}
 
 file_cache:
   path: ${CACHE_DIR}
